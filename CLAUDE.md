@@ -89,11 +89,10 @@ Two tables in Neon Postgres (see `schema.sql`):
 - `daily_votes (ip_hash TEXT, date DATE, created_at) PK(ip_hash, date)` — deduplication table.
 
 ### Design tokens
-- Background: `#050510`
 - Accent / signal colour: `signal-500` = `#fcd34d` (amber) — defined in `tailwind.config.js` as custom `signal` palette.
 - Fonts: **Anton** (headings, big counter, SVG letter "A") + **JetBrains Mono** (stats, labels).
 
-Task Tracking
+### Task Tracking
 Use bd (Beads) for task tracking:
 
 bd new "title" — create an issue before starting any planned task

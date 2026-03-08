@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import type { AnimState } from '../types'
 
 interface Props {
@@ -22,17 +22,25 @@ function getToday(): string {
   return new Date().toISOString().split('T')[0]
 }
 
+type ResolveState = 'idle' | 'loading' | 'success' | 'error'
+
 export function BatSignal({ onSuccess }: Props) {
   const [state, setState] = useState<AnimState>('idle')
   const [message, setMessage] = useState<string | null>(null)
+  const [resolveState, setResolveState] = useState<ResolveState>('idle')
+  const alreadyVotedHits = useRef(0)
 
   const handleClick = useCallback(async () => {
     if (state === 'loading') return
 
     if (getCookie('afc_voted') === getToday()) {
+      alreadyVotedHits.current++
+      const msg = alreadyVotedHits.current > 1
+        ? 'Per molt que insisteixis, la llum no tornarà abans (per desgràcia)'
+        : 'Gràcies, un altre veí ja ha reportat l\'incidència d\'avui'
       setState('already_voted')
-      setMessage('Ja ho sabem, tio 🕯️')
-      setTimeout(() => { setState('idle'); setMessage(null) }, 2500)
+      setMessage(msg)
+      setTimeout(() => { setState('idle'); setMessage(null) }, 2800)
       return
     }
 
@@ -50,9 +58,10 @@ export function BatSignal({ onSuccess }: Props) {
 
       if (res.status === 409) {
         setCookie('afc_voted', getToday())
+        alreadyVotedHits.current = 1
         setState('already_voted')
-        setMessage('Ja ho sabem, tio 🕯️')
-        setTimeout(() => { setState('idle'); setMessage(null) }, 2500)
+        setMessage('Gràcies, un altre veí ja ha reportat l\'incidència d\'avui')
+        setTimeout(() => { setState('idle'); setMessage(null) }, 2800)
       } else if (res.ok) {
         setCookie('afc_voted', getToday())
         setState('success')
@@ -76,9 +85,28 @@ export function BatSignal({ onSuccess }: Props) {
     }
   }, [state, onSuccess])
 
-  const isClickable = state !== 'loading'
+  const handleResolve = useCallback(async () => {
+    if (resolveState === 'loading') return
+    setResolveState('loading')
+    try {
+      const res = await fetch('/api/resolve', { method: 'POST' })
+      if (res.ok) {
+        setResolveState('success')
+        onSuccess()
+        setTimeout(() => setResolveState('idle'), 3000)
+      } else {
+        setResolveState('error')
+        setTimeout(() => setResolveState('idle'), 3000)
+      }
+    } catch {
+      setResolveState('error')
+      setTimeout(() => setResolveState('idle'), 3000)
+    }
+  }, [resolveState, onSuccess])
 
-  // Container animation (shake / blink applied to the whole image)
+  const isClickable = state !== 'loading'
+  const isResolvable = resolveState !== 'loading'
+
   const containerAnim =
     state === 'already_voted' ? 'animate-shake' :
     (state === 'network_error' || state === 'server_error') ? 'animate-blink' :
@@ -86,58 +114,101 @@ export function BatSignal({ onSuccess }: Props) {
 
   const msgStyle =
     state === 'already_voted'
-      ? 'border border-signal-600/50 bg-signal-700/10 text-signal-400'
+      ? 'border border-amber-500/50 bg-amber-900/10 text-amber-400'
       : 'border border-red-500/50 bg-red-900/10 text-red-400'
 
   return (
     <div className="flex flex-col items-center gap-3">
 
-      {/* ── Image wrapper ── */}
-      <div className={`relative touch-signal ${containerAnim}`}>
+      {/* ── Both buttons side by side ── */}
+      <div className="flex items-end justify-center gap-6">
 
-        {/* Success: white flash overlay */}
-        {state === 'success' && (
-          <div className="absolute inset-0 rounded-[18px] bg-white/30 animate-pulse pointer-events-none z-10" />
-        )}
+        {/* Report button */}
+        <div className="flex flex-col items-center gap-1.5">
+          <div className={`relative touch-signal ${containerAnim}`}>
+            {state === 'success' && (
+              <div className="absolute inset-0 rounded-[18px] bg-white/30 animate-pulse pointer-events-none z-10" />
+            )}
+            <img
+              src="/signal.png"
+              alt="Foco projectant la A — toca per reportar un apagó"
+              draggable={false}
+              role="button"
+              tabIndex={0}
+              aria-label="Toca per reportar un apagó"
+              className={[
+                'block select-none',
+                'w-[min(42vw,180px)] sm:w-44',
+                'transition-[opacity,transform] duration-150',
+                isClickable
+                  ? 'cursor-pointer active:opacity-70 active:scale-[0.96]'
+                  : 'cursor-wait opacity-50',
+                state === 'loading' ? 'animate-pulse' : '',
+              ].join(' ')}
+              onClick={isClickable ? handleClick : undefined}
+              onKeyDown={(e) => { if (e.key === 'Enter' && isClickable) handleClick() }}
+            />
+          </div>
+          <p className={[
+            'text-[10px] font-mono uppercase tracking-[0.2em] transition-opacity duration-300',
+            state === 'loading' ? 'text-amber-400/60 animate-pulse' : 'text-white/25',
+          ].join(' ')}>
+            {state === 'loading' ? 'enviant...' : '— reportar —'}
+          </p>
+        </div>
 
-        <img
-          src="/signal.png"
-          alt="Foco proyectando la A en el cielo — toca per reportar un apagó"
-          draggable={false}
-          role="button"
-          tabIndex={0}
-          aria-label="Toca per reportar un apagó"
-          className={[
-            'block select-none',
-            // Size: ~65% viewport width on mobile, capped at 300px on larger screens
-            'w-[min(52vw,220px)] sm:w-56',
-            // Press feedback
-            'transition-[opacity,transform] duration-150',
-            isClickable
-              ? 'cursor-pointer active:opacity-70 active:scale-[0.96]'
-              : 'cursor-wait opacity-50',
-            // Loading: subtle pulse
-            state === 'loading' ? 'animate-pulse' : '',
-          ].join(' ')}
-          onClick={isClickable ? handleClick : undefined}
-          onKeyDown={(e) => { if (e.key === 'Enter' && isClickable) handleClick() }}
-        />
+        {/* Resolve button */}
+        <div className="flex flex-col items-center gap-1.5">
+          <div className="relative touch-signal">
+            {resolveState === 'success' && (
+              <div className="absolute inset-0 rounded-[18px] bg-emerald-400/20 animate-pulse pointer-events-none z-10" />
+            )}
+            <img
+              src="/resolve.jpg"
+              alt="Bombeta encesa — toca per marcar que la llum ha tornat"
+              draggable={false}
+              role="button"
+              tabIndex={0}
+              aria-label="Toca per marcar que la llum ha tornat"
+              className={[
+                'block select-none rounded-xl',
+                'w-[min(42vw,180px)] sm:w-44',
+                'transition-[opacity,transform] duration-150',
+                isResolvable
+                  ? 'cursor-pointer active:opacity-70 active:scale-[0.96]'
+                  : 'cursor-wait opacity-50',
+                resolveState === 'loading' ? 'animate-pulse' : '',
+              ].join(' ')}
+              onClick={isResolvable ? handleResolve : undefined}
+              onKeyDown={(e) => { if (e.key === 'Enter' && isResolvable) handleResolve() }}
+            />
+          </div>
+          <p className={[
+            'text-[10px] font-mono uppercase tracking-[0.2em] transition-opacity duration-300',
+            resolveState === 'loading' ? 'text-emerald-400/60 animate-pulse' : 'text-white/25',
+          ].join(' ')}>
+            {resolveState === 'loading' ? 'enviant...' :
+             resolveState === 'success' ? '✓ resolt' :
+             '— resolta —'}
+          </p>
+        </div>
+
       </div>
 
-      {/* State message */}
+      {/* Report state message */}
       {message && (
-        <div className={`px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[260px] ${msgStyle}`}>
+        <div className={`px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] ${msgStyle}`}>
           {message}
         </div>
       )}
 
-      {/* Hint */}
-      <p className={[
-        'text-[11px] font-mono uppercase tracking-[0.25em] transition-opacity duration-300',
-        state === 'loading' ? 'text-signal-500/70 animate-pulse' : 'text-white/25',
-      ].join(' ')}>
-        {state === 'loading' ? 'enviant...' : '— toca per reportar —'}
-      </p>
+      {/* Resolve error message */}
+      {resolveState === 'error' && (
+        <div className="px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] border border-red-500/50 bg-red-900/10 text-red-400">
+          Error al marcar la resolució
+        </div>
+      )}
+
     </div>
   )
 }

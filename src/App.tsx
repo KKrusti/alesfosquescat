@@ -40,10 +40,9 @@ export default function App() {
   // When everything is fine:        show "Dies des de l'últim incident"
   const hasActiveStreak = (stats?.current_incident_streak ?? 0) > 0
 
-  // Dummy value 4 shown while there's no DB data yet (stats null or both zeros)
   const primaryValue: number = stats
     ? (hasActiveStreak ? stats.current_incident_streak : stats.days_since_last_incident)
-    : 4
+    : 0
 
   const longestStreak: number = stats?.longest_incident_streak ?? 0
 
@@ -56,7 +55,7 @@ export default function App() {
           <div className="w-[3px] self-stretch bg-amber-400 rounded-full shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-amber-400 font-bold text-[15px] leading-tight tracking-tight">
-              alesfosquestcat
+              alesfosquescat
             </p>
             <p className="text-white/35 text-[11px] leading-tight mt-0.5">
               Santa Eulàlia de Ronçana
@@ -180,7 +179,7 @@ export default function App() {
 
         <footer className="py-5 border-t border-white/6 text-center">
           <p className="text-white/15 text-[10px] tracking-widest">
-            alesfosquestcat · Santa Eulàlia de Ronçana · {new Date().getFullYear()}
+            alesfosquescat · Santa Eulàlia de Ronçana · {new Date().getFullYear()}
           </p>
         </footer>
       </main>

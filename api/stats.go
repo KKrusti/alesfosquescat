@@ -50,6 +50,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().In(loc)
 
+	// ── Read streak counters ──────────────────────────────────────────
+	var currentStreak, longestStreak int
+	_ = db.QueryRow(
+		`SELECT current_streak, longest_streak FROM streak_state WHERE id = 1`,
+	).Scan(&currentStreak, &longestStreak)
+
+	// ── Read incident dates for date-based stats ──────────────────────
 	rows, err := db.Query(
 		`SELECT date FROM incidents
 		  WHERE EXTRACT(YEAR FROM date) = $1
@@ -72,7 +79,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		dates = append(dates, d)
 	}
 
-	writeJSON(w, computeStats(dates, now))
+	s := computeStats(dates, now)
+	s.CurrentIncidentStreak = currentStreak
+	s.LongestIncidentStreak = longestStreak
+	writeJSON(w, s)
 }
 
 // computeStats calculates all derived statistics from the sorted incident dates.

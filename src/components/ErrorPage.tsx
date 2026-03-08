@@ -7,7 +7,7 @@ export function ErrorPage() {
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <div className="w-[3px] self-stretch bg-amber-400/40 rounded-full shrink-0" />
           <div>
-            <p className="text-amber-400/60 font-bold text-[15px] leading-tight">alesfosquestcat</p>
+            <p className="text-amber-400/60 font-bold text-[15px] leading-tight">alesfosquescat</p>
             <p className="text-white/20 text-[11px] leading-tight mt-0.5">Santa Eulàlia de Ronçana</p>
           </div>
         </div>

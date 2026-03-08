@@ -63,13 +63,30 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Upsert incident for today ─────────────────────────────────────
-	if _, err = db.Exec(
+	result, err := db.Exec(
 		`INSERT INTO incidents (date) VALUES ($1) ON CONFLICT (date) DO NOTHING`,
 		today,
-	); err != nil {
+	)
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		writeJSON(w, map[string]string{"error": "failed to record incident"})
 		return
+	}
+
+	// ── Increment streak counter (only on the first report of the day) ─
+	if n, _ := result.RowsAffected(); n == 1 {
+		if _, err = db.Exec(`
+			INSERT INTO streak_state (id, current_streak, longest_streak)
+			VALUES (1, 1, 1)
+			ON CONFLICT (id) DO UPDATE
+			  SET current_streak = streak_state.current_streak + 1,
+			      longest_streak = GREATEST(streak_state.longest_streak, streak_state.current_streak + 1),
+			      updated_at     = NOW()
+		`); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			writeJSON(w, map[string]string{"error": "failed to update streak"})
+			return
+		}
 	}
 
 	// ── Record this vote ──────────────────────────────────────────────

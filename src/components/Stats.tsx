@@ -79,17 +79,17 @@ export function Stats({ stats, loading }: Props) {
         const pctNormal   = 100 - pctIncident
         return (
           <div className="pt-4 pb-1">
-            <div className="h-1.5 flex rounded-full overflow-hidden bg-stone-200 dark:bg-white/8">
+            <div className="h-3 flex rounded-full overflow-hidden bg-sky-500/30 dark:bg-sky-400/20">
               <div
-                className="bg-amber-500/70 dark:bg-amber-400/55 transition-all duration-500"
+                className="bg-yellow-400 dark:bg-yellow-300 transition-all duration-500"
                 style={{ width: `${pctIncident}%` }}
               />
             </div>
             <div className="flex justify-between mt-1.5">
-              <span className="text-[10px] text-amber-600/80 dark:text-amber-400/50 font-mono tabular-nums">
+              <span className="text-[10px] text-yellow-600 dark:text-yellow-300/70 font-mono tabular-nums">
                 {pctIncident}% {t.statNights.toLowerCase()}
               </span>
-              <span className="text-[10px] text-sky-600/70 dark:text-sky-400/50 font-mono tabular-nums">
+              <span className="text-[10px] text-sky-600/80 dark:text-sky-400/60 font-mono tabular-nums">
                 {pctNormal}% {t.statNormal.toLowerCase()}
               </span>
             </div>

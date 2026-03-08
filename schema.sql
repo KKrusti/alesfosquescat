@@ -18,12 +18,16 @@ CREATE TABLE IF NOT EXISTS daily_votes (
 
 -- tabla streak_state: comptador persistent de ratxes (una sola fila, id=1)
 CREATE TABLE IF NOT EXISTS streak_state (
-  id              INT PRIMARY KEY DEFAULT 1,
-  current_streak  INT NOT NULL DEFAULT 0,
-  longest_streak  INT NOT NULL DEFAULT 0,
-  updated_at      TIMESTAMPTZ DEFAULT NOW(),
+  id                    INT PRIMARY KEY DEFAULT 1,
+  current_streak        INT NOT NULL DEFAULT 0,
+  longest_streak        INT NOT NULL DEFAULT 0,
+  streak_before_resolve INT NOT NULL DEFAULT 0,
+  updated_at            TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT single_row CHECK (id = 1)
 );
+
+-- Migració: afegir columna streak_before_resolve si no existeix (idempotent)
+ALTER TABLE streak_state ADD COLUMN IF NOT EXISTS streak_before_resolve INT NOT NULL DEFAULT 0;
 
 -- Seed the single row (noop if already exists)
 INSERT INTO streak_state (id) VALUES (1) ON CONFLICT DO NOTHING;

@@ -18,6 +18,10 @@ function setCookie(name: string, value: string) {
   document.cookie = `${name}=${value}; expires=${d.toUTCString()}; path=/; SameSite=Strict`
 }
 
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`
+}
+
 function getToday(): string {
   return new Date().toISOString().split('T')[0]
 }
@@ -92,6 +96,8 @@ export function BatSignal({ onSuccess }: Props) {
     try {
       const res = await fetch('/api/resolve', { method: 'POST' })
       if (res.ok) {
+        deleteCookie('afc_voted')
+        alreadyVotedHits.current = 0
         setResolveState('success')
         onSuccess()
         setTimeout(() => setResolveState('idle'), 3000)

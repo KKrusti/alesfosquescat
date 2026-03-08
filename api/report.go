@@ -73,15 +73,47 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Increment streak counter (only on the first report of the day) ─
-	if n, _ := result.RowsAffected(); n == 1 {
+	// ── Actualitzar streak counter ───────────────────────────────────────
+	// Llegim l'estat actual per decidir com actualitzar-lo.
+	rowsInserted, _ := result.RowsAffected()
+
+	var currentStreak, streakBeforeResolve int
+	_ = db.QueryRow(
+		`SELECT current_streak, streak_before_resolve FROM streak_state WHERE id = 1`,
+	).Scan(&currentStreak, &streakBeforeResolve)
+
+	// Casos que requereixen actualització:
+	//  A. currentStreak == 0: s'havia marcat com a resolt (per error o no).
+	//     Restaurem la racha des d'on estava (streak_before_resolve).
+	//     Això cobreix tant el primer report del dia (incident nou, RowsAffected==1)
+	//     com el re-report del mateix dia després de resoldre (RowsAffected==0).
+	//  B. currentStreak > 0 i incident NOU (RowsAffected==1): incrementem.
+	//     Si RowsAffected==0 amb streak actiu, ja estava comptat → no fem res.
+	if currentStreak == 0 {
+		newStreak := streakBeforeResolve
+		if newStreak == 0 {
+			newStreak = 1
+		}
 		if _, err = db.Exec(`
-			INSERT INTO streak_state (id, current_streak, longest_streak)
-			VALUES (1, 1, 1)
+			INSERT INTO streak_state (id, current_streak, longest_streak, streak_before_resolve)
+			VALUES (1, $1, $1, 0)
 			ON CONFLICT (id) DO UPDATE
-			  SET current_streak = streak_state.current_streak + 1,
-			      longest_streak = GREATEST(streak_state.longest_streak, streak_state.current_streak + 1),
-			      updated_at     = NOW()
+			  SET current_streak        = $1,
+			      longest_streak        = GREATEST(streak_state.longest_streak, $1),
+			      streak_before_resolve = 0,
+			      updated_at            = NOW()
+		`, newStreak); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			writeJSON(w, map[string]string{"error": "failed to update streak"})
+			return
+		}
+	} else if rowsInserted == 1 {
+		if _, err = db.Exec(`
+			UPDATE streak_state
+			   SET current_streak = current_streak + 1,
+			       longest_streak = GREATEST(longest_streak, current_streak + 1),
+			       updated_at     = NOW()
+			 WHERE id = 1
 		`); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			writeJSON(w, map[string]string{"error": "failed to update streak"})

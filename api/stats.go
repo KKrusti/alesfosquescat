@@ -90,8 +90,10 @@ func computeStats(dates []time.Time, now time.Time) StatsResponse {
 	s := StatsResponse{}
 	s.TotalThisYear = len(dates)
 
-	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
-	todayMidnight := now.Truncate(24 * time.Hour)
+	loc := now.Location()
+	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, loc)
+	// Medianoche d'avui en timezone Madrid (Truncate opera en UTC, no en local)
+	todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
 	if len(dates) == 0 {
 		daysSinceYearStart := int(todayMidnight.Sub(yearStart).Hours()/24) + 1
@@ -101,15 +103,23 @@ func computeStats(dates []time.Time, now time.Time) StatsResponse {
 	}
 
 	// ── Last incident ─────────────────────────────────────────────────
-	last := dates[len(dates)-1].Truncate(24 * time.Hour)
+	// Normalitzem la data de l'incident a medianoche Madrid
+	lastRaw := dates[len(dates)-1].In(loc)
+	last := time.Date(lastRaw.Year(), lastRaw.Month(), lastRaw.Day(), 0, 0, 0, 0, loc)
 	s.LastIncidentDate = last.Format("2006-01-02")
 	s.DaysSinceLastIncident = int(todayMidnight.Sub(last).Hours() / 24)
 
 	// ── Longest incident streak (consecutive days with incidents) ─────
+	// normalDay normalitza un time.Time a medianoche en timezone Madrid
+	normalDay := func(t time.Time) time.Time {
+		d := t.In(loc)
+		return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc)
+	}
+
 	maxStreak, cur := 1, 1
 	for i := 1; i < len(dates); i++ {
-		prev := dates[i-1].Truncate(24 * time.Hour)
-		this := dates[i].Truncate(24 * time.Hour)
+		prev := normalDay(dates[i-1])
+		this := normalDay(dates[i])
 		if int(this.Sub(prev).Hours()/24) == 1 {
 			cur++
 			if cur > maxStreak {
@@ -125,8 +135,8 @@ func computeStats(dates []time.Time, now time.Time) StatsResponse {
 	if s.DaysSinceLastIncident <= 1 {
 		cur = 1
 		for i := len(dates) - 1; i > 0; i-- {
-			prev := dates[i-1].Truncate(24 * time.Hour)
-			this := dates[i].Truncate(24 * time.Hour)
+			prev := normalDay(dates[i-1])
+			this := normalDay(dates[i])
 			if int(this.Sub(prev).Hours()/24) == 1 {
 				cur++
 			} else {
@@ -138,12 +148,12 @@ func computeStats(dates []time.Time, now time.Time) StatsResponse {
 
 	// ── Longest gap without incidents (max consecutive clean days) ────
 	// Gap before first incident
-	maxGap := int(dates[0].Truncate(24*time.Hour).Sub(yearStart).Hours() / 24)
+	maxGap := int(normalDay(dates[0]).Sub(yearStart).Hours() / 24)
 
 	// Gaps between consecutive incidents
 	for i := 1; i < len(dates); i++ {
-		prev := dates[i-1].Truncate(24 * time.Hour)
-		this := dates[i].Truncate(24 * time.Hour)
+		prev := normalDay(dates[i-1])
+		this := normalDay(dates[i])
 		gap := int(this.Sub(prev).Hours()/24) - 1
 		if gap > maxGap {
 			maxGap = gap

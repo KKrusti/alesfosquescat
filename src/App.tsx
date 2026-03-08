@@ -207,9 +207,6 @@ export default function App() {
           <p className="text-stone-400 dark:text-white/15 text-[10px] tracking-widest">
             alesfosquescat · Santa Eulàlia de Ronçana · {new Date().getFullYear()}
           </p>
-          <p className="text-stone-400 dark:text-white/20 text-[10px] tracking-wide">
-            Sàtira · Humor · Veïns indignats 🕯️
-          </p>
           <div className="flex items-center justify-center gap-4">
             <a
               href="/legal"

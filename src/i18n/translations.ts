@@ -58,6 +58,14 @@ export const translations = {
     errorSub:  '...com la llum',
     backHome:  "← Tornar a l'inici",
 
+    // History page
+    historyTitle:      'Historial d\'incidències',
+    historyEmpty:      'Sense incidències registrades aquest any',
+    historyDaySingle:  'nit',
+    historyDayPlural:  'nits',
+    historyLinkLabel:  'Mur de la vergonya →',
+    historyBack:       '← Tornar',
+
     // Legal page
     legalTitle:    'Avís legal',
     legalSatire:   'sàtira i humor',
@@ -124,6 +132,14 @@ export const translations = {
     error404: 'Esta página no existe...',
     errorSub: '...como la luz',
     backHome: '← Volver al inicio',
+
+    // History page
+    historyTitle:      'Historial de incidencias',
+    historyEmpty:      'Sin incidencias registradas este año',
+    historyDaySingle:  'noche',
+    historyDayPlural:  'noches',
+    historyLinkLabel:  'Muro de la vergüenza →',
+    historyBack:       '← Volver',
 
     // Legal page
     legalTitle:    'Aviso legal',

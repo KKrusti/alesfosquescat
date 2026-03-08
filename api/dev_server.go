@@ -39,6 +39,7 @@ func main() {
 	mux.HandleFunc("/api/report", reportHandler)
 	mux.HandleFunc("/api/stats", statsHandler)
 	mux.HandleFunc("/api/resolve", resolveHandler)
+	mux.HandleFunc("/api/history", historyHandler)
 
 	addr := ":8787"
 	log.Printf("API dev server → http://localhost%s\n", addr)
@@ -407,6 +408,95 @@ func todayInMadrid() string {
 		loc = time.UTC
 	}
 	return time.Now().In(loc).Format("2006-01-02")
+}
+
+// ── /api/history ──────────────────────────────────────────────────────────────
+
+func historyHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w, "GET, OPTIONS")
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeJSON(w, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	db, err := openDB()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": "db connection failed"})
+		return
+	}
+	defer db.Close()
+
+	loc, _ := time.LoadLocation("Europe/Madrid")
+	if loc == nil {
+		loc = time.UTC
+	}
+	now := time.Now().In(loc)
+
+	rows, err := db.Query(
+		`SELECT date FROM incidents WHERE EXTRACT(YEAR FROM date) = $1 ORDER BY date ASC`,
+		now.Year(),
+	)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": "query failed"})
+		return
+	}
+	defer rows.Close()
+
+	var dates []time.Time
+	for rows.Next() {
+		var d time.Time
+		if err := rows.Scan(&d); err != nil {
+			continue
+		}
+		dates = append(dates, d.In(loc))
+	}
+
+	type IncidentPeriod struct {
+		StartDate string `json:"start_date"`
+		Days      int    `json:"days"`
+	}
+
+	day := func(t time.Time) time.Time {
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+	}
+
+	var periods []IncidentPeriod
+	if len(dates) > 0 {
+		start := day(dates[0])
+		count := 1
+		for i := 1; i < len(dates); i++ {
+			prev := day(dates[i-1])
+			curr := day(dates[i])
+			if int(curr.Sub(prev).Hours()/24) == 1 {
+				count++
+			} else {
+				periods = append(periods, IncidentPeriod{StartDate: start.Format("2006-01-02"), Days: count})
+				start = curr
+				count = 1
+			}
+		}
+		periods = append(periods, IncidentPeriod{StartDate: start.Format("2006-01-02"), Days: count})
+	}
+
+	// Reverse: most recent first
+	for i, j := 0, len(periods)-1; i < j; i, j = i+1, j-1 {
+		periods[i], periods[j] = periods[j], periods[i]
+	}
+
+	if periods == nil {
+		periods = []IncidentPeriod{}
+	}
+	w.WriteHeader(http.StatusOK)
+	writeJSON(w, periods)
 }
 
 // loadDotEnv lee variables de entorno desde un archivo .env (formato KEY="VALUE")

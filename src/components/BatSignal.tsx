@@ -163,7 +163,7 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
               <div className="absolute inset-0 rounded-[18px] bg-emerald-400/20 animate-pulse pointer-events-none z-10" />
             )}
             <img
-              src="/resolve.jpg"
+              src="/resolver.jpg"
               alt={t.resolveAlt}
               draggable={false}
               role="button"
@@ -171,7 +171,7 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
               aria-label={t.resolveAriaLabel}
               className={[
                 'block select-none rounded-xl',
-                'w-[min(21vw,90px)] sm:w-[88px]',
+                'w-[min(17vw,66px)] sm:w-[66px]',
                 'transition-[opacity,transform] duration-150',
                 isResolvable
                   ? 'cursor-pointer active:opacity-70 active:scale-[0.96]'

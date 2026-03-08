@@ -215,7 +215,15 @@ export default function App() {
 
         {/* ── Annual data ── */}
         <section className="py-5">
-          <p className="section-label">{t.sectionStats}</p>
+          <div className="flex items-center justify-between mb-[14px]">
+            <p className="section-label !mb-0">{t.sectionStats}</p>
+            <a
+              href="/historial"
+              className="text-[10px] uppercase tracking-widest text-amber-700/60 dark:text-amber-400/50 hover:text-amber-700 dark:hover:text-amber-400 transition-colors font-medium"
+            >
+              {t.historyLinkLabel}
+            </a>
+          </div>
           <Stats stats={stats} loading={statsLoading} />
         </section>
 

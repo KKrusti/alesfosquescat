@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="ca">
   <head>
+    <!-- Prevent FOUC: apply theme class before React mounts -->
+    <script>if(localStorage.getItem('afc_theme')!=='light')document.documentElement.classList.add('dark')</script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

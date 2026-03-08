@@ -115,8 +115,8 @@ export function BatSignal({ onSuccess }: Props) {
 
   const msgStyle =
     state === 'already_voted'
-      ? 'border border-amber-500/50 bg-amber-900/10 text-amber-400'
-      : 'border border-red-500/50 bg-red-900/10 text-red-400'
+      ? 'border border-amber-600/40 dark:border-amber-500/50 bg-amber-500/10 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400'
+      : 'border border-red-500/50 bg-red-500/10 dark:bg-red-900/10 text-red-600 dark:text-red-400'
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -152,7 +152,7 @@ export function BatSignal({ onSuccess }: Props) {
           </div>
           <p className={[
             'text-[10px] font-mono uppercase tracking-[0.2em] transition-opacity duration-300',
-            state === 'loading' ? 'text-amber-400/60 animate-pulse' : 'text-white/25',
+            state === 'loading' ? 'text-amber-600 dark:text-amber-400/60 animate-pulse' : 'text-stone-400 dark:text-white/25',
           ].join(' ')}>
             {state === 'loading' ? 'enviant...' : '— reportar —'}
           </p>
@@ -186,7 +186,7 @@ export function BatSignal({ onSuccess }: Props) {
           </div>
           <p className={[
             'text-[10px] font-mono uppercase tracking-[0.2em] transition-opacity duration-300',
-            resolveState === 'loading' ? 'text-emerald-400/60 animate-pulse' : 'text-white/25',
+            resolveState === 'loading' ? 'text-emerald-600 dark:text-emerald-400/60 animate-pulse' : 'text-stone-400 dark:text-white/25',
           ].join(' ')}>
             {resolveState === 'loading' ? 'enviant...' :
              resolveState === 'success' ? '✓ resolt' :
@@ -205,7 +205,7 @@ export function BatSignal({ onSuccess }: Props) {
 
       {/* Resolve error message */}
       {resolveState === 'error' && (
-        <div className="px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] border border-red-500/50 bg-red-900/10 text-red-400">
+        <div className="px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] border border-red-500/50 bg-red-500/10 dark:bg-red-900/10 text-red-600 dark:text-red-400">
           Error al marcar la resolució
         </div>
       )}

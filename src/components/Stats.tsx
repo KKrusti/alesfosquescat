@@ -12,18 +12,18 @@ interface StatItem {
 }
 
 const STAT_ITEMS: StatItem[] = [
-  { key: 'total_this_year',           label: 'Dies sense llum',          text: 'text-amber-400' },
-  { key: 'longest_incident_streak',   label: 'Ratxa màx. sense llum',    text: 'text-yellow-300' },
-  { key: 'longest_no_incident_streak',label: 'Ratxa màx. sense apagades', text: 'text-sky-400' },
+  { key: 'total_this_year',           label: 'Dies sense llum',          text: 'text-amber-700 dark:text-amber-400' },
+  { key: 'longest_incident_streak',   label: 'Ratxa màx. sense llum',    text: 'text-amber-600 dark:text-yellow-300' },
+  { key: 'longest_no_incident_streak',label: 'Ratxa màx. sense apagades', text: 'text-sky-600 dark:text-sky-400' },
 ]
 
 function StatRow({ item, value, index }: { item: StatItem; value: number; index: number }) {
   return (
     <div
-      className="flex items-center justify-between py-3.5 border-b border-white/7"
+      className="flex items-center justify-between py-3.5 border-b border-stone-200 dark:border-white/7"
       style={{ animationDelay: `${index * 50}ms` }}
     >
-      <span className="text-[13px] text-white/50 tracking-wide">{item.label}</span>
+      <span className="text-[13px] text-stone-500 dark:text-white/50 tracking-wide">{item.label}</span>
       <span
         className={`text-2xl font-black leading-none shrink-0 ml-4 ${item.text}`}
         style={{ fontFamily: 'Anton, sans-serif' }}
@@ -36,9 +36,9 @@ function StatRow({ item, value, index }: { item: StatItem; value: number; index:
 
 function SkeletonRow() {
   return (
-    <div className="flex items-center justify-between py-3.5 border-b border-white/7">
-      <div className="h-3.5 w-44 bg-white/7 rounded animate-pulse" />
-      <div className="h-6 w-8 bg-white/7 rounded animate-pulse ml-4" />
+    <div className="flex items-center justify-between py-3.5 border-b border-stone-200 dark:border-white/7">
+      <div className="h-3.5 w-44 bg-stone-200 dark:bg-white/7 rounded animate-pulse" />
+      <div className="h-6 w-8 bg-stone-200 dark:bg-white/7 rounded animate-pulse ml-4" />
     </div>
   )
 }
@@ -62,10 +62,10 @@ export function Stats({ stats, loading }: Props) {
 
       {stats.last_incident_date && (
         <div className="flex items-center justify-between pt-4">
-          <span className="text-[11px] text-white/25 uppercase tracking-widest">
+          <span className="text-[11px] text-stone-400 dark:text-white/25 uppercase tracking-widest">
             Darrer incident
           </span>
-          <span className="text-[13px] text-white/40 font-mono">
+          <span className="text-[13px] text-stone-500 dark:text-white/40 font-mono">
             {stats.last_incident_date}
           </span>
         </div>

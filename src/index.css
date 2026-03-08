@@ -2,14 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Theme tokens — light (default) / dark ─── */
+:root {
+  --bg-page:        #F5F1EB;
+  --bg-header:      rgba(245, 241, 235, 0.95);
+  --bg-skeleton:    #E7E5E4;
+  --bg-skeleton-2:  #F5F5F4;
+
+  --text-1:  #1C1917;
+  --text-2:  #57534E;
+  --text-3:  #78716C;
+  --text-4:  #A8A29E;
+  --text-5:  #D6D3D1;
+
+  --border:        rgba(28, 25, 23, 0.10);
+  --border-amber:  rgba(180, 83, 9, 0.18);
+
+  --amber:      #B45309;
+  --amber-dim:  rgba(180, 83, 9, 0.50);
+
+  --status-incident:      #DC2626;
+  --status-incident-bg:   rgba(220, 38, 38, 0.10);
+  --status-incident-bdg:  rgba(220, 38, 38, 0.35);
+  --status-ok:            #059669;
+  --status-ok-bg:         rgba(5, 150, 105, 0.10);
+  --status-ok-bdg:        rgba(5, 150, 105, 0.30);
+
+  --card-bg:      rgba(251, 191, 36, 0.06);
+  --card-border:  rgba(180, 83, 9, 0.18);
+  --badge-record: rgba(180, 83, 9, 0.08);
+
+  --live-dot:   #B45309;
+  --live-border: rgba(180, 83, 9, 0.30);
+  --live-bg:    rgba(180, 83, 9, 0.10);
+  --live-text:  rgba(180, 83, 9, 0.80);
+
+  --toggle-bg:     rgba(255,255,255,0.60);
+  --toggle-border: rgba(28, 25, 23, 0.12);
+  --toggle-text:   #78716C;
+}
+
+.dark {
+  --bg-page:        #0d0d1c;
+  --bg-header:      rgba(13, 13, 28, 0.95);
+  --bg-skeleton:    rgba(255,255,255,0.06);
+  --bg-skeleton-2:  rgba(255,255,255,0.04);
+
+  --text-1:  #ffffff;
+  --text-2:  rgba(255,255,255,0.50);
+  --text-3:  rgba(255,255,255,0.40);
+  --text-4:  rgba(255,255,255,0.25);
+  --text-5:  rgba(255,255,255,0.15);
+
+  --border:        rgba(255,255,255,0.08);
+  --border-amber:  rgba(251, 191, 36, 0.14);
+
+  --amber:      #FBBF24;
+  --amber-dim:  rgba(251, 191, 36, 0.50);
+
+  --status-incident:      #F87171;
+  --status-incident-bg:   rgba(248, 113, 113, 0.08);
+  --status-incident-bdg:  rgba(239, 68,  68,  0.30);
+  --status-ok:            #34D399;
+  --status-ok-bg:         rgba(52,  211, 153, 0.08);
+  --status-ok-bdg:        rgba(16,  185, 129, 0.30);
+
+  --card-bg:      rgba(251, 191, 36, 0.04);
+  --card-border:  rgba(251, 191, 36, 0.14);
+  --badge-record: rgba(251, 191, 36, 0.06);
+
+  --live-dot:    #FBBF24;
+  --live-border: rgba(251, 191, 36, 0.25);
+  --live-bg:     rgba(251, 191, 36, 0.08);
+  --live-text:   rgba(251, 191, 36, 0.80);
+
+  --toggle-bg:     rgba(255,255,255,0.05);
+  --toggle-border: rgba(255,255,255,0.10);
+  --toggle-text:   rgba(255,255,255,0.40);
+}
+
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
 
   html { height: -webkit-fill-available; }
 
   body {
-    background: #0d0d1c;
-    color: #ffffff;
+    background: var(--bg-page);
+    color: var(--text-1);
     font-family: system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
@@ -17,6 +96,7 @@
     overscroll-behavior: none;
     min-height: 100vh;
     min-height: -webkit-fill-available;
+    transition: background-color 200ms ease, color 200ms ease;
   }
 }
 
@@ -29,21 +109,21 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.4em;
-  color: rgba(251, 191, 36, 0.45);
+  color: var(--amber-dim);
   margin-bottom: 14px;
 }
 
 .section-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--border);
 }
 
 .status-card {
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  background: rgba(251, 191, 36, 0.04);
-  border: 1px solid rgba(251, 191, 36, 0.14);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 10px;
   padding: 16px;
 }

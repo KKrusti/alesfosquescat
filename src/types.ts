@@ -7,6 +7,12 @@ export interface StatsResponse {
   current_incident_streak: number
 }
 
+export interface WeatherResponse {
+  alert: boolean
+  days_until: number
+  mm: number
+}
+
 export type AnimState =
   | 'idle'
   | 'loading'

@@ -67,6 +67,15 @@ CREATE TABLE IF NOT EXISTS interaction_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- tabla weather_cache: una sola fila (id=1) amb el resultat d'Open-Meteo.
+--   data: JSON { alert, days_until, mm } actualitzat cada 12h pel cron de Vercel.
+CREATE TABLE IF NOT EXISTS weather_cache (
+  id         INT PRIMARY KEY DEFAULT 1,
+  data       JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT single_row_weather CHECK (id = 1)
+);
+
 -- Índexs per rendiment
 CREATE INDEX IF NOT EXISTS idx_incidents_date      ON incidents(date);
 CREATE INDEX IF NOT EXISTS idx_daily_votes_date    ON daily_votes(date);

@@ -71,6 +71,10 @@ export const translations = {
     historyActionReportRestored: 'Reactivant ratxa',
     historyActionResolve:        'Llum restaurada',
 
+    // Weather alert banner
+    weatherAlertToday: '⚠️ Risc de pluja avui. Aneu carregant les llanternes. 🔦',
+    weatherAlertDays:  '⚠️ Risc de pluja en {days} dies. Aneu carregant les llanternes. 🔦',
+
     // Legal page
     legalTitle:    'Avís legal',
     legalSatire:   'sàtira i humor',
@@ -150,6 +154,10 @@ export const translations = {
     historyActionReport:         'Apagón reportado',
     historyActionReportRestored: 'Reactivando racha',
     historyActionResolve:        'Luz restaurada',
+
+    // Weather alert banner
+    weatherAlertToday: '⚠️ Riesgo de lluvia hoy. Id cargando las linternas. 🔦',
+    weatherAlertDays:  '⚠️ Riesgo de lluvia en {days} días. Id cargando las linternas. 🔦',
 
     // Legal page
     legalTitle:    'Aviso legal',

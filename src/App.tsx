@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { BatSignal } from './components/BatSignal'
 import { Stats } from './components/Stats'
+import { WeatherAlert } from './components/WeatherAlert'
 import { useTheme } from './context/ThemeContext'
 import { useLanguage } from './context/LanguageContext'
 import type { StatsResponse } from './types'
@@ -116,6 +117,11 @@ export default function App() {
 
       {/* ── Content ─────────────────────────────────────────────────── */}
       <main className="max-w-lg mx-auto px-4 pb-safe">
+
+        {/* ── Weather alert ── */}
+        <div className="pt-4">
+          <WeatherAlert />
+        </div>
 
         {/* ── Current status ── */}
         <section className="pt-5 pb-4">

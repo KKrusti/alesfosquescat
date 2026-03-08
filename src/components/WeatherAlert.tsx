@@ -1,0 +1,39 @@
+import { useEffect, useState } from 'react'
+import { useLanguage } from '../context/LanguageContext'
+import type { WeatherResponse } from '../types'
+
+export function WeatherAlert() {
+  const { t } = useLanguage()
+  const [data, setData] = useState<WeatherResponse | null>(null)
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mock') === '1') {
+      setData({ alert: true, days_until: 3, mm: 18.5 })
+      return
+    }
+    fetch('/api/weather')
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: WeatherResponse | null) => setData(d))
+      .catch(() => {})
+  }, [])
+
+  if (!data?.alert) return null
+
+  const message =
+    data.days_until === 0
+      ? t.weatherAlertToday
+      : t.weatherAlertDays.replace('{days}', String(data.days_until))
+
+  return (
+    <div
+      role="alert"
+      aria-live="polite"
+      className="status-card border-sky-400/35 dark:border-sky-500/20 bg-sky-500/6 dark:bg-sky-500/4"
+    >
+      <div className="w-[3px] self-stretch rounded-full shrink-0 my-0.5 bg-sky-500 dark:bg-sky-400" />
+      <p className="flex-1 text-sky-700 dark:text-sky-300 text-sm leading-snug">
+        {message}
+      </p>
+    </div>
+  )
+}

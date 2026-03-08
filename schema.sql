@@ -1,0 +1,22 @@
+-- alesfosquescat — Neon Postgres schema
+-- Run once on your Neon project before deploying
+
+-- tabla incidents: un registro por día con apagón confirmado
+CREATE TABLE IF NOT EXISTS incidents (
+  id         SERIAL PRIMARY KEY,
+  date       DATE UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- tabla daily_votes: evitar duplicados por usuario/día
+CREATE TABLE IF NOT EXISTS daily_votes (
+  ip_hash    TEXT NOT NULL,
+  date       DATE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (ip_hash, date)
+);
+
+-- Índexs per rendiment
+CREATE INDEX IF NOT EXISTS idx_incidents_date    ON incidents(date);
+CREATE INDEX IF NOT EXISTS idx_daily_votes_date  ON daily_votes(date);
+CREATE INDEX IF NOT EXISTS idx_daily_votes_hash  ON daily_votes(ip_hash);

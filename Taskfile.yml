@@ -1,0 +1,47 @@
+version: "3"
+
+tasks:
+  # ── Frontend ──────────────────────────────────────────────────────────────
+  frontend:
+    desc: "Start Vite dev server (port 5173, accessible from Windows via WSL2)"
+    cmds:
+      - npm run dev -- --host 0.0.0.0
+
+  frontend:build:
+    desc: "Production build (tsc + vite build → dist/)"
+    cmds:
+      - npm run build
+
+  frontend:preview:
+    desc: "Preview the production build locally"
+    cmds:
+      - npm run preview
+
+  # ── Backend ───────────────────────────────────────────────────────────────
+  backend:
+    desc: "Validate Go handlers (each file compiled in isolation, mirrors vercel-go)"
+    dir: api
+    cmds:
+      - go build report.go
+      - go build stats.go
+      - rm -f report stats
+      - echo "✓ Go handlers OK"
+
+  backend:tidy:
+    desc: "Sync api/go.sum"
+    dir: api
+    cmds:
+      - go mod tidy
+
+  # ── Full stack ────────────────────────────────────────────────────────────
+  run:
+    desc: "Start full stack with Vercel CLI (frontend + Go API functions, accessible from Windows via WSL2)"
+    cmds:
+      - vercel dev --listen 0.0.0.0:3000
+
+  # ── Checks ────────────────────────────────────────────────────────────────
+  check:
+    desc: "Type-check frontend + validate Go handlers"
+    cmds:
+      - task: frontend:build
+      - task: backend

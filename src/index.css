@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: #050510;
+    color: #ffffff;
+    font-family: 'JetBrains Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+}
+
+/* ─── SVG fill animation (can't be in Tailwind keyframes) ─── */
+
+@keyframes flash-letter {
+  0%, 100% {
+    fill: #fcd34d;
+    filter: drop-shadow(0 0 8px rgba(252, 211, 77, 0.6));
+  }
+  16%, 50%, 83% {
+    fill: #ffffff;
+    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.9));
+  }
+  33%, 66% {
+    fill: #fcd34d;
+    filter: drop-shadow(0 0 8px rgba(252, 211, 77, 0.6));
+  }
+}
+
+.bat-letter-flash {
+  animation: flash-letter 2s ease-in-out forwards;
+}
+
+/* ─── Bat signal oscillation pivot ─── */
+
+.bat-signal-group {
+  transform-box: fill-box;
+}
+
+/* ─── prefers-reduced-motion override ─── */
+
+@media (prefers-reduced-motion: reduce) {
+  .bat-signal-group,
+  .bat-signal-group * {
+    animation: none !important;
+  }
+}

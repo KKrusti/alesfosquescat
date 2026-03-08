@@ -4,51 +4,27 @@ import { useLanguage } from '../context/LanguageContext'
 
 interface Props {
   onSuccess: () => void
-}
-
-function getCookie(name: string): string {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) return parts.pop()!.split(';').shift() ?? ''
-  return ''
-}
-
-function setCookie(name: string, value: string) {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  document.cookie = `${name}=${value}; expires=${d.toUTCString()}; path=/; SameSite=Strict`
-}
-
-function deleteCookie(name: string) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`
-}
-
-function getToday(): string {
-  return new Date().toISOString().split('T')[0]
+  hasActiveStreak: boolean
 }
 
 type ResolveState = 'idle' | 'loading' | 'success' | 'error' | 'already_resolved'
 
-export function BatSignal({ onSuccess }: Props) {
+export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
   const { t } = useLanguage()
   const [state, setState] = useState<AnimState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [resolveState, setResolveState] = useState<ResolveState>('idle')
   const [resolveMessage, setResolveMessage] = useState<string | null>(null)
-  const alreadyVotedHits = useRef(0)
   const resolvedToday = useRef(false)
 
   const handleClick = useCallback(async () => {
     if (state === 'loading') return
 
-    // Client-side duplicate guard using cookie
-    if (getCookie('afc_voted') === getToday()) {
-      alreadyVotedHits.current++
-      const isSpam = alreadyVotedHits.current > 1
-      const msg = isSpam ? t.msgAlreadySpam : t.msgAlready
+    // If streak is already active, nothing to report
+    if (hasActiveStreak) {
       setState('already_voted')
-      setMessage(msg)
-      setTimeout(() => { setState('idle'); setMessage(null) }, isSpam ? 5500 : 2800)
+      setMessage(t.msgAlreadyActive)
+      setTimeout(() => { setState('idle'); setMessage(null) }, 2800)
       return
     }
 
@@ -64,18 +40,19 @@ export function BatSignal({ onSuccess }: Props) {
       })
       clearTimeout(tid)
 
-      if (res.status === 409) {
-        setCookie('afc_voted', getToday())
-        alreadyVotedHits.current = 1
-        setState('already_voted')
-        setMessage(t.msgAlready)
-        setTimeout(() => { setState('idle'); setMessage(null) }, 2800)
-      } else if (res.ok) {
-        setCookie('afc_voted', getToday())
-        setState('success')
-        setMessage(null)
-        onSuccess()
-        setTimeout(() => setState('idle'), 3000)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.already_active) {
+          // Backend safety net: streak became active between the check and the call
+          setState('already_voted')
+          setMessage(t.msgAlreadyActive)
+          setTimeout(() => { setState('idle'); setMessage(null) }, 2800)
+        } else {
+          setState('success')
+          setMessage(null)
+          onSuccess()
+          setTimeout(() => setState('idle'), 3000)
+        }
       } else if (res.status >= 500) {
         setState('server_error')
         setMessage(t.msgServerError)
@@ -91,7 +68,7 @@ export function BatSignal({ onSuccess }: Props) {
       setMessage(isAbort ? t.msgTimeout : t.msgNetworkError)
       setTimeout(() => { setState('idle'); setMessage(null) }, 3500)
     }
-  }, [state, onSuccess, t])
+  }, [state, hasActiveStreak, onSuccess, t])
 
   const handleResolve = useCallback(async () => {
     if (resolveState === 'loading') return
@@ -108,8 +85,6 @@ export function BatSignal({ onSuccess }: Props) {
     try {
       const res = await fetch('/api/resolve', { method: 'POST' })
       if (res.ok) {
-        deleteCookie('afc_voted')
-        alreadyVotedHits.current = 0
         resolvedToday.current = true
         setResolveState('success')
         onSuccess()
@@ -166,7 +141,7 @@ export function BatSignal({ onSuccess }: Props) {
                 state === 'loading' ? 'animate-pulse' : '',
               ].join(' ')}
               onClick={isClickable ? handleClick : undefined}
-              onKeyDown={(e) => { if (e.key === 'Enter' && isClickable) handleClick() }}
+              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && isClickable) handleClick() }}
             />
           </div>
           <p className={[
@@ -200,7 +175,7 @@ export function BatSignal({ onSuccess }: Props) {
                 resolveState === 'loading' ? 'animate-pulse' : '',
               ].join(' ')}
               onClick={isResolvable ? handleResolve : undefined}
-              onKeyDown={(e) => { if (e.key === 'Enter' && isResolvable) handleResolve() }}
+              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && isResolvable) handleResolve() }}
             />
           </div>
           <p className={[

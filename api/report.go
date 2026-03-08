@@ -15,15 +15,15 @@ import (
 )
 
 // Handler — POST /api/report
-// Registra un apagón per avui. Màxim 1 cop per dia per IP (hash SHA-256).
+// Records an outage for today.
 //
-// Si el streak estava inactiu (incident_start IS NULL):
-//   - Comprova si hi ha una fila action='resolve' per aquesta IP avui:
-//     si n'hi ha, restaura incident_start_saved (l'usuari havia resolt per error).
-//     si no n'hi ha, activa amb incident_start = avui.
+// Guard: if a streak is already active (incident_start IS NOT NULL), returns
+// already_active — the frontend uses the live stats to show this before calling.
 //
-// Si el streak ja estava actiu (incident_start NOT NULL):
-//   - No toca streak_state; el streak creix automàticament cada dia.
+// If no active streak:
+//   - If the community resolved today, restores incident_start_saved so the
+//     counter returns to the pre-resolve value (false-resolve correction).
+//   - Otherwise starts a fresh streak from today.
 func Handler(w http.ResponseWriter, r *http.Request) {
 	setCORSHeaders(w, "POST, OPTIONS")
 	w.Header().Set("Content-Type", "application/json")
@@ -50,34 +50,28 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// ── Rate limit: max 10 peticions per IP per minut ────────────────
+	// ── Rate limit: max 10 requests per IP per minute ─────────────────
 	if exceeded, err := checkRateLimit(db, ipHash, "report", 10); err == nil && exceeded {
 		w.WriteHeader(http.StatusTooManyRequests)
 		writeJSON(w, map[string]string{"error": "massa peticions, espera un minut"})
 		return
 	}
 
-	// ── Duplicate-vote check (action='report') ────────────────────────
-	var alreadyVoted bool
-	err = db.QueryRow(
-		`SELECT EXISTS(SELECT 1 FROM daily_votes WHERE ip_hash=$1 AND date=$2 AND action='report')`,
-		ipHash, today,
-	).Scan(&alreadyVoted)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "vote check failed"})
-		return
-	}
-	if alreadyVoted {
-		w.WriteHeader(http.StatusConflict)
-		writeJSON(w, map[string]interface{}{
-			"already_voted": true,
-			"message":       "Ja ho sabem, tio 🕯️",
-		})
+	// ── Read current streak state ──────────────────────────────────────
+	var incidentStart sql.NullString
+	_ = db.QueryRow(
+		`SELECT to_char(incident_start, 'YYYY-MM-DD') FROM streak_state WHERE id = 1`,
+	).Scan(&incidentStart)
+
+	// If a streak is already active, nothing to do — the frontend shows this
+	// state before even calling the API, but handle it here as a safety net.
+	if incidentStart.Valid && incidentStart.String != "" {
+		w.WriteHeader(http.StatusOK)
+		writeJSON(w, map[string]interface{}{"already_active": true})
 		return
 	}
 
-	// ── Upsert incident for today ─────────────────────────────────────
+	// ── Upsert today's incident ────────────────────────────────────────
 	if _, err = db.Exec(
 		`INSERT INTO incidents (date) VALUES ($1) ON CONFLICT (date) DO NOTHING`,
 		today,
@@ -87,52 +81,29 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Activar streak si estava inactiu ─────────────────────────────
-	var incidentStart sql.NullString
-	_ = db.QueryRow(
-		`SELECT to_char(incident_start, 'YYYY-MM-DD') FROM streak_state WHERE id = 1`,
-	).Scan(&incidentStart)
+	// ── Determine streak start: restore if resolved today, else start fresh ──
+	var resolveStart sql.NullString
+	_ = db.QueryRow(`
+		SELECT to_char(incident_start_saved, 'YYYY-MM-DD')
+		  FROM daily_votes
+		 WHERE ip_hash = 'community' AND date = $1 AND action = 'resolve'
+		 LIMIT 1
+	`, today).Scan(&resolveStart)
 
-	if !incidentStart.Valid || incidentStart.String == "" {
-		// Streak inactiu → determinar la data d'inici.
-		// Si hi ha un resolve de l'IP d'avui, restaurem incident_start_saved.
-		// Això cobreix el cas "resolt per error → torna a reportar el mateix dia".
-		var resolveStart sql.NullString
-		_ = db.QueryRow(`
-			SELECT to_char(incident_start_saved, 'YYYY-MM-DD')
-			  FROM daily_votes
-			 WHERE date = $1 AND action = 'resolve'
-			 LIMIT 1
-		`, today).Scan(&resolveStart)
-
-		var activateFrom string
-		if resolveStart.Valid && resolveStart.String != "" {
-			activateFrom = resolveStart.String
-		} else {
-			activateFrom = today
-		}
-
-		if _, err = db.Exec(`
-			INSERT INTO streak_state (id, incident_start, updated_at)
-			VALUES (1, $1, NOW())
-			ON CONFLICT (id) DO UPDATE
-			  SET incident_start = $1,
-			      updated_at     = NOW()
-		`, activateFrom); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			writeJSON(w, map[string]string{"error": "failed to activate streak"})
-			return
-		}
+	activateFrom := today
+	if resolveStart.Valid && resolveStart.String != "" {
+		activateFrom = resolveStart.String
 	}
-	// Si incident_start ja tenia valor, el streak ja estava actiu → no fer res.
 
-	// ── Record this vote ──────────────────────────────────────────────
-	if _, err = db.Exec(
-		`INSERT INTO daily_votes (ip_hash, date, action) VALUES ($1, $2, 'report')`,
-		ipHash, today,
-	); err != nil {
+	if _, err = db.Exec(`
+		INSERT INTO streak_state (id, incident_start, updated_at)
+		VALUES (1, $1, NOW())
+		ON CONFLICT (id) DO UPDATE
+		  SET incident_start = $1,
+		      updated_at     = NOW()
+	`, activateFrom); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to record vote"})
+		writeJSON(w, map[string]string{"error": "failed to activate streak"})
 		return
 	}
 

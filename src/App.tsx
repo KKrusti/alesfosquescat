@@ -200,7 +200,7 @@ export default function App() {
         <section className="py-5">
           <p className="section-label">{t.sectionReport}</p>
           <div className="flex flex-col items-center">
-            <BatSignal onSuccess={fetchStats} />
+            <BatSignal onSuccess={fetchStats} hasActiveStreak={hasActiveStreak} />
           </div>
         </section>
 

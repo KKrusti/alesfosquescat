@@ -40,8 +40,7 @@ export const translations = {
     resolvedLabel:    '✓ resolt',
 
     // BatSignal — feedback messages
-    msgAlreadySpam:    'Per molt que insisteixis, la llum no tornarà abans (per desgràcia)',
-    msgAlready:        "Gràcies, un altre veí ja ha reportat l'incidència d'avui",
+    msgAlreadyActive:  'La ratxa ja està activa, gràcies',
     msgServerError:    "El servidor també s'ha apagat",
     msgNetworkError:   "S'ha anat la llum... irònic",
     msgTimeout:        "Timeout — s'ha anat la llum... irònic",
@@ -106,8 +105,7 @@ export const translations = {
     resolvedLabel:    '✓ resuelto',
 
     // BatSignal — feedback messages
-    msgAlreadySpam:    'Por mucho que insistas, la luz no volverá antes (por desgracia)',
-    msgAlready:        'Gracias, otro vecino ya ha reportado el incidente de hoy',
+    msgAlreadyActive:  'La racha ya está activa, gracias',
     msgServerError:    'El servidor también se ha apagado',
     msgNetworkError:   'Se ha ido la luz... irónico',
     msgTimeout:        'Timeout — se ha ido la luz... irónico',

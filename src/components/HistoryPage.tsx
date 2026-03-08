@@ -7,7 +7,7 @@ interface IncidentPeriod {
 }
 
 interface InteractionEntry {
-  action: 'report' | 'resolve'
+  action: 'report' | 'report_restored' | 'resolve'
   at: string // "DD-MM-YYYY HH:mm" already formatted server-side
 }
 
@@ -42,16 +42,29 @@ export function HistoryPage() {
   const [loadingInteractions, setLoadingInteractions] = useState(true)
 
   useEffect(() => {
-    fetch('/api/history')
-      .then(r => r.ok ? r.json() : [])
-      .then(setPeriods)
-      .catch(() => setPeriods([]))
+    const fetchWithRetry = async (url: string, retries = 2, delayMs = 800): Promise<unknown[]> => {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const r = await fetch(url)
+          if (r.ok) return await r.json()
+          if (r.status >= 500 && attempt < retries) {
+            await new Promise(res => setTimeout(res, delayMs))
+            continue
+          }
+          return []
+        } catch {
+          if (attempt < retries) await new Promise(res => setTimeout(res, delayMs))
+        }
+      }
+      return []
+    }
+
+    fetchWithRetry('/api/history')
+      .then(data => setPeriods(data as IncidentPeriod[]))
       .finally(() => setLoadingPeriods(false))
 
-    fetch('/api/interactions')
-      .then(r => r.ok ? r.json() : [])
-      .then(setInteractions)
-      .catch(() => setInteractions([]))
+    fetchWithRetry('/api/interactions')
+      .then(data => setInteractions(data as InteractionEntry[]))
       .finally(() => setLoadingInteractions(false))
   }, [])
 
@@ -118,23 +131,33 @@ export function HistoryPage() {
               </p>
             ) : (
               interactions.map((entry, i) => {
-                const isReport = entry.action === 'report'
+                const isResolve  = entry.action === 'resolve'
+                const isRestored = entry.action === 'report_restored'
+                const label = isResolve
+                  ? t.historyActionResolve
+                  : isRestored
+                    ? t.historyActionReportRestored
+                    : t.historyActionReport
                 return (
                   <div
                     key={i}
                     className={`flex items-center gap-3 py-3 px-3 ${i < interactions.length - 1 ? 'border-b border-stone-200 dark:border-white/7' : ''}`}
                   >
                     <span className={`w-2 h-2 rounded-full shrink-0 ${
-                      isReport
-                        ? 'bg-amber-500 dark:bg-amber-400'
-                        : 'bg-emerald-500 dark:bg-emerald-400'
+                      isResolve
+                        ? 'bg-emerald-500 dark:bg-emerald-400'
+                        : isRestored
+                          ? 'bg-orange-400 dark:bg-orange-400'
+                          : 'bg-amber-500 dark:bg-amber-400'
                     }`} />
                     <span className={`text-[13px] ${
-                      isReport
-                        ? 'text-amber-700 dark:text-amber-400'
-                        : 'text-emerald-700 dark:text-emerald-400'
+                      isResolve
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : isRestored
+                          ? 'text-orange-600 dark:text-orange-400'
+                          : 'text-amber-700 dark:text-amber-400'
                     }`}>
-                      {isReport ? t.historyActionReport : t.historyActionResolve}
+                      {label}
                     </span>
                     <span className="text-[11px] text-stone-400 dark:text-white/25 font-mono tabular-nums ml-auto">
                       {entry.at}

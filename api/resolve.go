@@ -140,7 +140,14 @@ func calcStreak(startDate string) int {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func openDB() (*sql.DB, error) {
-	return sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return nil, err
+	}
+	// Serverless: one connection per invocation, release immediately after use
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(0)
+	return db, nil
 }
 
 func setCORSHeaders(w http.ResponseWriter, methods string) {

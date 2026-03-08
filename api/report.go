@@ -109,7 +109,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Best-effort log — do not block the response if this fails
-	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('report')`)
+	logAction := "report"
+	if restored {
+		logAction = "report_restored"
+	}
+	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ($1)`, logAction)
 
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{
@@ -122,7 +126,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 func openDB() (*sql.DB, error) {
-	return sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return nil, err
+	}
+	// Serverless: one connection per invocation, release immediately after use
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(0)
+	return db, nil
 }
 
 // setCORSHeaders restricts cross-origin access to the configured ALLOWED_ORIGIN.

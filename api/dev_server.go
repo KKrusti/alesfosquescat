@@ -122,7 +122,11 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('report')`)
+	logAction := "report"
+	if restored {
+		logAction = "report_restored"
+	}
+	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ($1)`, logAction)
 
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{"success": true, "restored": restored, "date": today})
@@ -376,7 +380,14 @@ func computeStats(dates []time.Time, now time.Time) StatsResponse {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func openDB() (*sql.DB, error) {
-	return sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return nil, err
+	}
+	// Serverless: one connection per invocation, release immediately after use
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(0)
+	return db, nil
 }
 
 func setCORSHeaders(w http.ResponseWriter, methods string) {
@@ -537,6 +548,7 @@ func interactionsHandler(w http.ResponseWriter, r *http.Request) {
 		`SELECT action, created_at FROM interaction_log ORDER BY created_at DESC LIMIT 100`,
 	)
 	if err != nil {
+		log.Printf("[interactions] query error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		writeJSON(w, map[string]string{"error": "query failed"})
 		return

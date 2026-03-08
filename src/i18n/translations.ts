@@ -67,8 +67,9 @@ export const translations = {
     historyBack:           '← Tornar',
     historyActivityTitle:  'Activitat recent',
     historyActivityEmpty:  'Sense activitat registrada',
-    historyActionReport:   'Apagada reportada',
-    historyActionResolve:  'Llum restaurada',
+    historyActionReport:         'Apagada reportada',
+    historyActionReportRestored: 'Reactivant ratxa',
+    historyActionResolve:        'Llum restaurada',
 
     // Legal page
     legalTitle:    'Avís legal',
@@ -146,8 +147,9 @@ export const translations = {
     historyBack:           '← Volver',
     historyActivityTitle:  'Actividad reciente',
     historyActivityEmpty:  'Sin actividad registrada',
-    historyActionReport:   'Apagón reportado',
-    historyActionResolve:  'Luz restaurada',
+    historyActionReport:         'Apagón reportado',
+    historyActionReportRestored: 'Reactivando racha',
+    historyActionResolve:        'Luz restaurada',
 
     // Legal page
     legalTitle:    'Aviso legal',

@@ -131,11 +131,11 @@ export function BatSignal({ onSuccess }: Props) {
             )}
             <img
               src="/signal.png"
-              alt="Foco projectant la A — toca per reportar un apagó"
+              alt="Focus projectant la A — toca per reportar una apagada"
               draggable={false}
               role="button"
               tabIndex={0}
-              aria-label="Toca per reportar un apagó"
+              aria-label="Toca per reportar una apagada"
               className={[
                 'block select-none',
                 'w-[min(42vw,180px)] sm:w-44',
@@ -189,7 +189,7 @@ export function BatSignal({ onSuccess }: Props) {
           ].join(' ')}>
             {resolveState === 'loading' ? 'enviant...' :
              resolveState === 'success' ? '✓ resolt' :
-             '— resolta —'}
+             '— resoldre —'}
           </p>
         </div>
 

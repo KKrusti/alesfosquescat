@@ -177,10 +177,19 @@ export default function App() {
           <Stats stats={stats} loading={statsLoading} />
         </section>
 
-        <footer className="py-5 border-t border-white/6 text-center">
+        <footer className="py-5 border-t border-white/6 text-center space-y-2">
           <p className="text-white/15 text-[10px] tracking-widest">
             alesfosquescat · Santa Eulàlia de Ronçana · {new Date().getFullYear()}
           </p>
+          <p className="text-white/20 text-[10px] tracking-wide">
+            Sàtira · Humor · Veïns indignats 🕯️
+          </p>
+          <a
+            href="/legal"
+            className="inline-block text-white/20 text-[10px] tracking-widest hover:text-amber-400/50 transition-colors"
+          >
+            Avís legal
+          </a>
         </footer>
       </main>
     </div>

@@ -1,8 +1,8 @@
 {
   "functions": {
-    "api/*.go": {
-      "runtime": "@vercel/go@3.4.3"
-    }
+    "api/report.go":  { "runtime": "@vercel/go@3.4.3" },
+    "api/stats.go":   { "runtime": "@vercel/go@3.4.3" },
+    "api/weather.go": { "runtime": "@vercel/go@3.4.3" }
   },
   "buildCommand": "npm run build",
   "outputDirectory": "dist",

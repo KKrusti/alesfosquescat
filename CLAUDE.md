@@ -96,6 +96,8 @@ go vet report.go && go vet stats.go  # vet each file independently
 
 > **Important:** `go vet ./...` (or `go build ./...`) on the whole `/api` directory **intentionally fails** — vercel-go compiles each `.go` file as an isolated function. Always validate files individually.
 
+> **Adding a new handler:** When creating a new `api/foo.go`, add it explicitly to the `functions` block in `vercel.json`. The glob `api/*.go` is intentionally NOT used to prevent Vercel from picking up `_test.go` files as serverless functions.
+
 ### Database
 ```bash
 psql $DATABASE_URL -f schema.sql   # create tables (run once on Neon)

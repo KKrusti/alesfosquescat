@@ -1,4 +1,8 @@
+import { useLanguage } from '../context/LanguageContext'
+
 export function ErrorPage() {
+  const { t } = useLanguage()
+
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-[#0d0d1c] flex flex-col transition-colors duration-200">
 
@@ -29,17 +33,17 @@ export function ErrorPage() {
         />
 
         <p className="text-stone-700 dark:text-white/60 text-lg font-semibold mb-1">
-          Aquesta pàgina no existeix...
+          {t.error404}
         </p>
         <p className="text-amber-600 dark:text-amber-400/50 text-base mb-8">
-          ...com la llum
+          {t.errorSub}
         </p>
 
         <a
           href="/"
           className="px-5 py-2.5 rounded border border-amber-600/30 dark:border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-500/15 dark:hover:bg-amber-500/12 transition-colors"
         >
-          ← Tornar a l&apos;inici
+          {t.backHome}
         </a>
       </main>
     </div>

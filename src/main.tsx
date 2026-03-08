@@ -6,11 +6,13 @@ import App from './App'
 import { ErrorPage } from './components/ErrorPage'
 import { LegalPage } from './components/LegalPage'
 import { ThemeProvider } from './context/ThemeContext'
+import { LanguageProvider } from './context/LanguageContext'
 import { SpeedInsights } from "@vercel/speed-insights/react"
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
+      <LanguageProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<App />} />
@@ -18,6 +20,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="*" element={<ErrorPage />} />
         </Routes>
       </BrowserRouter>
+      </LanguageProvider>
       <SpeedInsights />
     </ThemeProvider>
   </StrictMode>,

@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { BatSignal } from './components/BatSignal'
 import { Stats } from './components/Stats'
 import { useTheme } from './context/ThemeContext'
+import { useLanguage } from './context/LanguageContext'
 import type { StatsResponse } from './types'
+
 // Schedules a one-shot callback at the next local midnight
 function onNextMidnight(cb: () => void): () => void {
   const now = new Date()
@@ -34,6 +36,7 @@ export default function App() {
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const { theme, toggle } = useTheme()
+  const { lang, t, toggle: toggleLang } = useLanguage()
 
   const fetchStats = useCallback(async () => {
     try {
@@ -45,7 +48,7 @@ export default function App() {
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
-  // Auto-refresh at midnight so "dies des de l'últim incident" increments by itself
+  // Auto-refresh at midnight so the "days since last incident" counter increments on its own
   useEffect(() => {
     function scheduleNext() {
       return onNextMidnight(() => { fetchStats(); scheduleNext() })
@@ -77,16 +80,25 @@ export default function App() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Live badge */}
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-amber-600/30 dark:border-amber-500/25 bg-amber-500/10 dark:bg-amber-500/8 shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-600 dark:bg-amber-400 animate-pulse" />
               <span className="text-[10px] text-amber-700 dark:text-amber-400/80 uppercase tracking-widest font-medium">
-                en directe
+                {t.live}
               </span>
             </div>
+            {/* Language toggle */}
+            <button
+              onClick={toggleLang}
+              aria-label={lang === 'ca' ? 'Cambiar a castellano' : 'Canviar a català'}
+              className="px-2 py-1.5 rounded-lg border border-stone-200 dark:border-white/10 bg-white/60 dark:bg-white/5 text-stone-500 dark:text-white/40 hover:text-amber-700 dark:hover:text-amber-400 hover:border-amber-600/30 dark:hover:border-amber-500/30 transition-colors duration-150 cursor-pointer text-[10px] font-bold tracking-widest"
+            >
+              {lang === 'ca' ? 'ES' : 'CA'}
+            </button>
             {/* Theme toggle */}
             <button
               onClick={toggle}
-              aria-label={theme === 'dark' ? 'Canviar a mode clar' : 'Canviar a mode fosc'}
+              aria-label={theme === 'dark' ? t.toggleLight : t.toggleDark}
               className="p-2 rounded-lg border border-stone-200 dark:border-white/10 bg-white/60 dark:bg-white/5 text-stone-500 dark:text-white/40 hover:text-amber-700 dark:hover:text-amber-400 hover:border-amber-600/30 dark:hover:border-amber-500/30 transition-colors duration-150 cursor-pointer"
             >
               {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
@@ -98,9 +110,9 @@ export default function App() {
       {/* ── Content ─────────────────────────────────────────────────── */}
       <main className="max-w-lg mx-auto px-4 pb-safe">
 
-        {/* ── Estat actual ── */}
+        {/* ── Current status ── */}
         <section className="pt-5 pb-4">
-          <p className="section-label">Estat actual</p>
+          <p className="section-label">{t.sectionStatus}</p>
 
           <div className="space-y-3">
 
@@ -123,9 +135,7 @@ export default function App() {
                       {primaryValue}
                     </div>
                     <p className="text-stone-500 dark:text-white/40 text-xs mt-1.5 tracking-wide">
-                      {hasActiveStreak
-                        ? 'nits consecutives sense llum'
-                        : 'nits des de l\'últim incident'}
+                      {hasActiveStreak ? t.streakLabel : t.daysSinceLabel}
                     </p>
                   </>
                 )}
@@ -141,13 +151,13 @@ export default function App() {
                       : 'border-emerald-600/30 dark:border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-500/8 text-emerald-700 dark:text-emerald-400'
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${hasActiveStreak ? 'bg-red-500 dark:bg-red-400 animate-pulse' : 'bg-emerald-600 dark:bg-emerald-400'}`} />
-                    {hasActiveStreak ? 'Ratxa actual' : 'Tot bé'}
+                    {hasActiveStreak ? t.badgeActive : t.badgeOk}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Secondary card — Ratxa més llarga */}
+            {/* Secondary card — longest streak */}
             <div className="status-card">
               <div className="w-[3px] self-stretch bg-amber-600/50 dark:bg-amber-400/50 rounded-full shrink-0 my-0.5" />
 
@@ -166,7 +176,7 @@ export default function App() {
                       {longestStreak}
                     </div>
                     <p className="text-stone-500 dark:text-white/35 text-xs mt-1 tracking-wide">
-                      ratxa més llarga sense llum
+                      {t.longestLabel}
                     </p>
                   </>
                 )}
@@ -175,7 +185,7 @@ export default function App() {
               <div className="shrink-0 self-start mt-0.5">
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded border border-amber-600/25 dark:border-amber-500/20 bg-amber-500/8 dark:bg-amber-500/6">
                   <span className="text-[10px] text-amber-700 dark:text-amber-400/50 uppercase tracking-wider whitespace-nowrap">
-                    Rècord
+                    {t.recordBadge}
                   </span>
                 </div>
               </div>
@@ -186,9 +196,9 @@ export default function App() {
 
         <div className="section-divider" />
 
-        {/* ── Reportar ── */}
+        {/* ── Report incident ── */}
         <section className="py-5">
-          <p className="section-label">Reportar incidència</p>
+          <p className="section-label">{t.sectionReport}</p>
           <div className="flex flex-col items-center">
             <BatSignal onSuccess={fetchStats} />
           </div>
@@ -196,9 +206,9 @@ export default function App() {
 
         <div className="section-divider" />
 
-        {/* ── Dades anuals ── */}
+        {/* ── Annual data ── */}
         <section className="py-5">
-          <p className="section-label">Dades anuals</p>
+          <p className="section-label">{t.sectionStats}</p>
           <Stats stats={stats} loading={statsLoading} />
         </section>
 
@@ -211,13 +221,13 @@ export default function App() {
               href="/legal"
               className="text-stone-400 dark:text-white/20 text-[10px] tracking-widest hover:text-amber-700 dark:hover:text-amber-400/50 transition-colors"
             >
-              Avís legal
+              {t.legalLink}
             </a>
             <a
               href="https://www.instagram.com/ajstaeulaliaderoncana/"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Instagram de l'Ajuntament de Santa Eulàlia de Ronçana"
+              aria-label={t.instagramAriaLabel}
               className="text-stone-400 dark:text-white/20 hover:text-amber-700 dark:hover:text-amber-400/50 transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">

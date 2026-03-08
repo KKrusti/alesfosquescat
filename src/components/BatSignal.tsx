@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import type { AnimState } from '../types'
+import { useLanguage } from '../context/LanguageContext'
 
 interface Props {
   onSuccess: () => void
@@ -29,6 +30,7 @@ function getToday(): string {
 type ResolveState = 'idle' | 'loading' | 'success' | 'error' | 'already_resolved'
 
 export function BatSignal({ onSuccess }: Props) {
+  const { t } = useLanguage()
   const [state, setState] = useState<AnimState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [resolveState, setResolveState] = useState<ResolveState>('idle')
@@ -39,12 +41,11 @@ export function BatSignal({ onSuccess }: Props) {
   const handleClick = useCallback(async () => {
     if (state === 'loading') return
 
+    // Client-side duplicate guard using cookie
     if (getCookie('afc_voted') === getToday()) {
       alreadyVotedHits.current++
       const isSpam = alreadyVotedHits.current > 1
-      const msg = isSpam
-        ? 'Per molt que insisteixis, la llum no tornarà abans (per desgràcia)'
-        : 'Gràcies, un altre veí ja ha reportat l\'incidència d\'avui'
+      const msg = isSpam ? t.msgAlreadySpam : t.msgAlready
       setState('already_voted')
       setMessage(msg)
       setTimeout(() => { setState('idle'); setMessage(null) }, isSpam ? 5500 : 2800)
@@ -67,7 +68,7 @@ export function BatSignal({ onSuccess }: Props) {
         setCookie('afc_voted', getToday())
         alreadyVotedHits.current = 1
         setState('already_voted')
-        setMessage('Gràcies, un altre veí ja ha reportat l\'incidència d\'avui')
+        setMessage(t.msgAlready)
         setTimeout(() => { setState('idle'); setMessage(null) }, 2800)
       } else if (res.ok) {
         setCookie('afc_voted', getToday())
@@ -77,28 +78,28 @@ export function BatSignal({ onSuccess }: Props) {
         setTimeout(() => setState('idle'), 3000)
       } else if (res.status >= 500) {
         setState('server_error')
-        setMessage('El servidor també s\'ha apagat')
+        setMessage(t.msgServerError)
         setTimeout(() => { setState('idle'); setMessage(null) }, 3500)
       } else {
         setState('network_error')
-        setMessage('S\'ha anat la llum... irònic')
+        setMessage(t.msgNetworkError)
         setTimeout(() => { setState('idle'); setMessage(null) }, 3500)
       }
     } catch (err) {
       const isAbort = (err as Error).name === 'AbortError'
       setState('network_error')
-      setMessage(isAbort ? 'Timeout — s\'ha anat la llum... irònic' : 'S\'ha anat la llum... irònic')
+      setMessage(isAbort ? t.msgTimeout : t.msgNetworkError)
       setTimeout(() => { setState('idle'); setMessage(null) }, 3500)
     }
-  }, [state, onSuccess])
+  }, [state, onSuccess, t])
 
   const handleResolve = useCallback(async () => {
     if (resolveState === 'loading') return
 
-    // Spam guard: ja s'ha resolt avui
+    // Client-side guard: already resolved today in this session
     if (resolvedToday.current) {
       setResolveState('already_resolved')
-      setResolveMessage('L\'alcalde ja sap que és un miracle, no cal insistir')
+      setResolveMessage(t.msgAlreadyResolved)
       setTimeout(() => { setResolveState('idle'); setResolveMessage(null) }, 3500)
       return
     }
@@ -121,9 +122,9 @@ export function BatSignal({ onSuccess }: Props) {
       setResolveState('error')
       setTimeout(() => setResolveState('idle'), 3000)
     }
-  }, [resolveState, onSuccess])
+  }, [resolveState, onSuccess, t])
 
-  const isClickable = state !== 'loading'
+  const isClickable  = state !== 'loading'
   const isResolvable = resolveState !== 'loading'
 
   const containerAnim =
@@ -150,11 +151,11 @@ export function BatSignal({ onSuccess }: Props) {
             )}
             <img
               src="/signal.png"
-              alt="Focus projectant la A — toca per reportar una apagada"
+              alt={t.reportAlt}
               draggable={false}
               role="button"
               tabIndex={0}
-              aria-label="Toca per reportar una apagada"
+              aria-label={t.reportAriaLabel}
               className={[
                 'block select-none',
                 'w-[min(42vw,180px)] sm:w-44',
@@ -172,7 +173,7 @@ export function BatSignal({ onSuccess }: Props) {
             'text-[10px] font-mono uppercase tracking-[0.2em] transition-opacity duration-300',
             state === 'loading' ? 'text-amber-600 dark:text-amber-400/60 animate-pulse' : 'text-stone-400 dark:text-white/25',
           ].join(' ')}>
-            {state === 'loading' ? 'enviant...' : '— reportar —'}
+            {state === 'loading' ? t.sending : t.reportLabel}
           </p>
         </div>
 
@@ -184,11 +185,11 @@ export function BatSignal({ onSuccess }: Props) {
             )}
             <img
               src="/resolve.jpg"
-              alt="Bombeta encesa — toca per marcar que la llum ha tornat"
+              alt={t.resolveAlt}
               draggable={false}
               role="button"
               tabIndex={0}
-              aria-label="Toca per marcar que la llum ha tornat"
+              aria-label={t.resolveAriaLabel}
               className={[
                 'block select-none rounded-xl',
                 'w-[min(21vw,90px)] sm:w-[88px]',
@@ -206,9 +207,9 @@ export function BatSignal({ onSuccess }: Props) {
             'text-[10px] font-mono uppercase tracking-[0.2em] transition-opacity duration-300',
             resolveState === 'loading' ? 'text-emerald-600 dark:text-emerald-400/60 animate-pulse' : 'text-stone-400 dark:text-white/25',
           ].join(' ')}>
-            {resolveState === 'loading' ? 'enviant...' :
-             resolveState === 'success' ? '✓ resolt' :
-             '— resoldre —'}
+            {resolveState === 'loading' ? t.resolveSending :
+             resolveState === 'success' ? t.resolvedLabel :
+             t.resolveLabel}
           </p>
         </div>
 
@@ -224,7 +225,7 @@ export function BatSignal({ onSuccess }: Props) {
       {/* Resolve state message */}
       {resolveState === 'error' && (
         <div className="px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] border border-red-500/50 bg-red-500/10 dark:bg-red-900/10 text-red-600 dark:text-red-400">
-          Error al marcar la resolució
+          {t.msgResolveError}
         </div>
       )}
       {resolveState === 'already_resolved' && resolveMessage && (

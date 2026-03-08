@@ -1,4 +1,8 @@
+import { useLanguage } from '../context/LanguageContext'
+
 export function LegalPage() {
+  const { t } = useLanguage()
+
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-[#0d0d1c] flex flex-col transition-colors duration-200">
 
@@ -15,28 +19,21 @@ export function LegalPage() {
       </header>
 
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8">
-        <p className="section-label mb-6">Avís legal</p>
+        <p className="section-label mb-6">{t.legalTitle}</p>
 
         <div className="space-y-5 text-stone-600 dark:text-white/50 text-[13px] leading-relaxed">
 
           <p>
-            Aquesta web és una obra de <span className="text-amber-700 dark:text-amber-400/70">sàtira i humor</span> creada per un veí
-            del municipi sense gaires llums. No té caràcter oficial ni informatiu.
+            {t.legalP1Before}
+            <span className="text-amber-700 dark:text-amber-400/70">{t.legalSatire}</span>
+            {t.legalP1After}
           </p>
 
-          <p>
-            Les dades mostrades (dies sense llum, incidències) són aportacions anònimes d'usuaris
-            i no han estat verificades per cap organisme oficial.
-          </p>
+          <p>{t.legalP2}</p>
 
-          <p>
-            Aquesta web no té ànim de lucre ni pretén difamar cap persona física o jurídica.
-            Qualsevol semblança amb plans d'emergència oficials és purament humorística.
-          </p>
+          <p>{t.legalP3}</p>
 
-          <p>
-            El titular no es fa responsable de l'ús que tercers facin del contingut d'aquesta web.
-          </p>
+          <p>{t.legalP4}</p>
 
         </div>
 
@@ -45,7 +42,7 @@ export function LegalPage() {
             href="/"
             className="px-5 py-2.5 rounded border border-amber-600/30 dark:border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-500/15 dark:hover:bg-amber-500/12 transition-colors"
           >
-            ← Tornar a l&apos;inici
+            {t.backHome}
           </a>
         </div>
       </main>

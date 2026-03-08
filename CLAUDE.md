@@ -11,6 +11,21 @@ Always communicate with the user in Spanish, regardless of the language used in 
 
 ## Commands
 
+## Skills
+
+Before writing any code, **read** the corresponding SKILL.md file and **print the skill name visibly** in the response using the format `[skill: <name>]`. This must appear before any code or implementation detail.
+
+| Situation               | Skills to load                                                                     | Path                                                                                                                                     |
+|-------------------------|------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| Backend changes         | `golang-pro`                                                                       | `.claude/skills/golang-pro/SKILL.md`                                                                                                     |
+| Database changes | `neon-postgres`                                                                    | `.claude/skills/neon-postgres/SKILL.md`                                                                                                  |
+| Frontend / UI changes   | `vercel-react-best-practices` **+** `ui-ux-pro-max` **+** `tailwind-design-systems` | `.claude/skills/vercel-react-best-practices/SKILL.md` · `.claude/skills/ui-ux-pro-max/SKILL.md` · `.claude/skills/tailwind-design-system` |
+
+`vercel-react-best-practices` and `ui-ux-pro-max` are complementary and must always be loaded together for any frontend or UI work.
+
+**This is mandatory and non-negotiable.** The user explicitly requires seeing `[skill: <name>]` printed in the response to verify correct skill usage.
+
+
 ### Frontend
 ```bash
 npm run dev        # Vite dev server (port 5173)

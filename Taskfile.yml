@@ -3,7 +3,7 @@ version: "3"
 tasks:
   # ── Frontend ──────────────────────────────────────────────────────────────
   frontend:
-    desc: "Start Vite dev server (port 5173, accessible from Windows via WSL2)"
+    desc: "Start Vite dev server (port 5173, proxies /api → :8787, accessible from Windows via WSL2)"
     cmds:
       - npm run dev -- --host 0.0.0.0
 
@@ -27,6 +27,12 @@ tasks:
       - rm -f report stats
       - echo "✓ Go handlers OK"
 
+  backend:dev:
+    desc: "Start Go API dev server on :8787 (reads DATABASE_URL from .env.local)"
+    dir: api
+    cmds:
+      - go run dev_server.go
+
   backend:tidy:
     desc: "Sync api/go.sum"
     dir: api
@@ -35,9 +41,10 @@ tasks:
 
   # ── Full stack ────────────────────────────────────────────────────────────
   run:
-    desc: "Start full stack with Vercel CLI (frontend + Go API functions, accessible from Windows via WSL2)"
-    cmds:
-      - vercel dev --listen 0.0.0.0:3000
+    desc: "Start full stack: Go API on :8787 + Vite on :5173 (accessible from Windows via WSL2)"
+    deps:
+      - task: backend:dev
+      - task: frontend
 
   # ── Checks ────────────────────────────────────────────────────────────────
   check:

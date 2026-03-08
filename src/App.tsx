@@ -141,7 +141,7 @@ export default function App() {
                       {longestStreak}
                     </div>
                     <p className="text-white/35 text-xs mt-1 tracking-wide">
-                      ratxa més llarga d&apos;apagons
+                      ratxa més llarga sense llum
                     </p>
                   </>
                 )}

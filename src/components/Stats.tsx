@@ -103,7 +103,7 @@ export function Stats({ stats, loading }: Props) {
             {t.statLastIncident}
           </span>
           <span className="text-[13px] text-stone-500 dark:text-white/40 font-mono">
-            {stats.last_incident_date}
+            {stats.last_incident_date.split('-').reverse().join('-')}
           </span>
         </div>
       )}

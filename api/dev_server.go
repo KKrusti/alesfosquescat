@@ -61,8 +61,6 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := clientIP(r)
-	ipHash := sha256hex(ip)
 	today := todayInMadrid()
 
 	db, err := openDB()
@@ -104,8 +102,9 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 		 LIMIT 1
 	`, today).Scan(&resolveStart)
 
+	restored := resolveStart.Valid && resolveStart.String != ""
 	activateFrom := today
-	if resolveStart.Valid && resolveStart.String != "" {
+	if restored {
 		activateFrom = resolveStart.String
 	}
 
@@ -122,7 +121,7 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	writeJSON(w, map[string]interface{}{"success": true, "date": today})
+	writeJSON(w, map[string]interface{}{"success": true, "restored": restored, "date": today})
 }
 
 // ── /api/resolve ──────────────────────────────────────────────────────────────

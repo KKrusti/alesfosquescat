@@ -49,9 +49,9 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
           setTimeout(() => { setState('idle'); setMessage(null) }, 2800)
         } else {
           setState('success')
-          setMessage(null)
+          setMessage(data.restored ? t.msgRestored : null)
           onSuccess()
-          setTimeout(() => setState('idle'), 3000)
+          setTimeout(() => { setState('idle'); setMessage(null) }, 3000)
         }
       } else if (res.status >= 500) {
         setState('server_error')

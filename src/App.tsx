@@ -5,13 +5,20 @@ import { useTheme } from './context/ThemeContext'
 import { useLanguage } from './context/LanguageContext'
 import type { StatsResponse } from './types'
 
-// Schedules a one-shot callback at the next local midnight
+// Schedules a one-shot callback at the next midnight in Europe/Madrid,
+// regardless of the user's device timezone or VPN location.
 function onNextMidnight(cb: () => void): () => void {
   const now = new Date()
-  const midnight = new Date(now)
-  midnight.setDate(midnight.getDate() + 1)
-  midnight.setHours(0, 0, 0, 0)
-  const tid = setTimeout(cb, midnight.getTime() - now.getTime())
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Madrid',
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
+    hour12: false,
+  }).formatToParts(now)
+  const h = parseInt(parts.find(p => p.type === 'hour')!.value)
+  const m = parseInt(parts.find(p => p.type === 'minute')!.value)
+  const s = parseInt(parts.find(p => p.type === 'second')!.value)
+  const msUntilMidnight = ((24 * 3600) - (h * 3600 + m * 60 + s)) * 1000
+  const tid = setTimeout(cb, msUntilMidnight)
   return () => clearTimeout(tid)
 }
 

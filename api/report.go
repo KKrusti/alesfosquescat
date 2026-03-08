@@ -90,8 +90,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		 LIMIT 1
 	`, today).Scan(&resolveStart)
 
+	restored := resolveStart.Valid && resolveStart.String != ""
 	activateFrom := today
-	if resolveStart.Valid && resolveStart.String != "" {
+	if restored {
 		activateFrom = resolveStart.String
 	}
 
@@ -109,8 +110,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{
-		"success": true,
-		"date":    today,
+		"success":  true,
+		"restored": restored,
+		"date":     today,
 	})
 }
 

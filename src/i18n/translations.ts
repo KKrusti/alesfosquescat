@@ -41,6 +41,7 @@ export const translations = {
 
     // BatSignal — feedback messages
     msgAlreadyActive:  'La ratxa ja està activa, gràcies',
+    msgRestored:       'Reprenent la ratxa anterior',
     msgServerError:    "El servidor també s'ha apagat",
     msgNetworkError:   "S'ha anat la llum... irònic",
     msgTimeout:        "Timeout — s'ha anat la llum... irònic",
@@ -106,6 +107,7 @@ export const translations = {
 
     // BatSignal — feedback messages
     msgAlreadyActive:  'La racha ya está activa, gracias',
+    msgRestored:       'Retomando la racha anterior',
     msgServerError:    'El servidor también se ha apagado',
     msgNetworkError:   'Se ha ido la luz... irónico',
     msgTimeout:        'Timeout — se ha ido la luz... irónico',

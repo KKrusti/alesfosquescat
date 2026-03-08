@@ -29,7 +29,6 @@ export function BatSignal({ onSuccess }: Props) {
   const handleClick = useCallback(async () => {
     if (state === 'loading') return
 
-    // Client-side cookie check (fast path, no network)
     if (getCookie('afc_voted') === getToday()) {
       setState('already_voted')
       setMessage('Ja ho sabem, tio 🕯️')
@@ -77,186 +76,67 @@ export function BatSignal({ onSuccess }: Props) {
     }
   }, [state, onSuccess])
 
-  // ── Animation classes ──────────────────────────────────────────
-  const groupAnim =
-    state === 'already_voted' ? 'animate-shake' : 'animate-oscillate'
+  const isClickable = state !== 'loading'
 
-  const beamClass =
-    state === 'success' ? 'animate-pulse-beam' :
+  // Container animation (shake / blink applied to the whole image)
+  const containerAnim =
+    state === 'already_voted' ? 'animate-shake' :
     (state === 'network_error' || state === 'server_error') ? 'animate-blink' :
     ''
 
-  const letterClass = state === 'success' ? 'bat-letter-flash' : ''
-
-  const isClickable = state !== 'loading'
-
-  // ── Message styling ────────────────────────────────────────────
   const msgStyle =
     state === 'already_voted'
       ? 'border border-signal-600/50 bg-signal-700/10 text-signal-400'
-      : 'border border-red-500/50 bg-red-900/10 text-red-400 animate-pulse'
+      : 'border border-red-500/50 bg-red-900/10 text-red-400'
 
   return (
-    <div className="relative flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-3">
+
+      {/* ── Image wrapper ── */}
+      <div className={`relative touch-signal ${containerAnim}`}>
+
+        {/* Success: white flash overlay */}
+        {state === 'success' && (
+          <div className="absolute inset-0 rounded-[18px] bg-white/30 animate-pulse pointer-events-none z-10" />
+        )}
+
+        <img
+          src="/signal.png"
+          alt="Foco proyectando la A en el cielo — toca per reportar un apagó"
+          draggable={false}
+          role="button"
+          tabIndex={0}
+          aria-label="Toca per reportar un apagó"
+          className={[
+            'block select-none',
+            // Size: ~65% viewport width on mobile, capped at 300px on larger screens
+            'w-[min(72vw,300px)] sm:w-80',
+            // Press feedback
+            'transition-[opacity,transform] duration-150',
+            isClickable
+              ? 'cursor-pointer active:opacity-70 active:scale-[0.96]'
+              : 'cursor-wait opacity-50',
+            // Loading: subtle pulse
+            state === 'loading' ? 'animate-pulse' : '',
+          ].join(' ')}
+          onClick={isClickable ? handleClick : undefined}
+          onKeyDown={(e) => { if (e.key === 'Enter' && isClickable) handleClick() }}
+        />
+      </div>
+
       {/* State message */}
       {message && (
-        <div className={`px-4 py-2 rounded font-mono text-sm font-bold ${msgStyle}`}>
+        <div className={`px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[260px] ${msgStyle}`}>
           {message}
         </div>
       )}
 
-      {/* ── Bat signal SVG ── */}
-      <svg
-        viewBox="0 0 300 500"
-        className={[
-          'w-52 sm:w-64 md:w-72 select-none transition duration-300',
-          isClickable
-            ? 'cursor-pointer hover:drop-shadow-[0_0_30px_rgba(251,191,36,0.35)]'
-            : 'cursor-wait opacity-80',
-        ].join(' ')}
-        onClick={isClickable ? handleClick : undefined}
-        role="button"
-        aria-label="Fes click per reportar un apagó"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' && isClickable) handleClick() }}
-      >
-        <defs>
-          {/* Beam gradient: dense at bottom, fades upward */}
-          <linearGradient id="beamGrad" x1="0.5" y1="1" x2="0.5" y2="0">
-            <stop offset="0%"   stopColor="#fcd34d" stopOpacity="0.9" />
-            <stop offset="55%"  stopColor="#fbbf24" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#fbbf24" stopOpacity="0.04" />
-          </linearGradient>
-
-          {/* Projector lens glow */}
-          <radialGradient id="lensGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%"   stopColor="#fde68a" stopOpacity="0.95" />
-            <stop offset="50%"  stopColor="#f59e0b" stopOpacity="0.55" />
-            <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
-          </radialGradient>
-
-          {/* Glow filter for the A */}
-          <filter id="aGlow" x="-30%" y="-20%" width="160%" height="140%">
-            <feGaussianBlur stdDeviation="7" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-
-          {/* Soft glow for projector */}
-          <filter id="lensFilter" x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/*
-          ── Oscillating group ──────────────────────────────────────
-          Pivots at the projector centre (150, 458).
-          transform-origin set both via style AND transform-box:fill-box
-          (see index.css .bat-signal-group)
-        */}
-        <g
-          className={`bat-signal-group ${groupAnim}`}
-          style={{ transformOrigin: '150px 458px' }}
-        >
-          {/* Light beam */}
-          <polygon
-            points="150,440 42,12 258,12"
-            fill="url(#beamGrad)"
-            className={beamClass}
-          />
-
-          {/* Inner beam highlight */}
-          <polygon
-            points="150,440 110,100 190,100"
-            fill="#fcd34d"
-            opacity="0.06"
-          />
-
-          {/* ── The "A" — the clickable element ── */}
-          <text
-            x="150"
-            y="300"
-            textAnchor="middle"
-            fontSize="168"
-            fontWeight="900"
-            fontFamily="'Anton', Impact, sans-serif"
-            fill="#fcd34d"
-            filter="url(#aGlow)"
-            className={letterClass}
-            style={{ letterSpacing: '-4px' }}
-          >
-            A
-          </text>
-
-          {/* Projector housing rect */}
-          <rect
-            x="112" y="444"
-            width="76" height="26"
-            rx="7"
-            fill="#0e0e22"
-            stroke="#2e2e50"
-            strokeWidth="1.5"
-          />
-
-          {/* Projector outer lens ring */}
-          <ellipse
-            cx="150" cy="458"
-            rx="40" ry="17"
-            fill="#181830"
-            stroke="#3a3a6a"
-            strokeWidth="2"
-          />
-
-          {/* Projector mid lens */}
-          <ellipse
-            cx="150" cy="458"
-            rx="28" ry="12"
-            fill="#0d0d20"
-            stroke="#4444a0"
-            strokeWidth="1"
-          />
-
-          {/* Projector lens glow */}
-          <ellipse
-            cx="150" cy="458"
-            rx="18" ry="7"
-            fill="url(#lensGlow)"
-            filter="url(#lensFilter)"
-          />
-
-          {/* Lens highlight specular */}
-          <ellipse
-            cx="142" cy="454"
-            rx="7" ry="2.5"
-            fill="white"
-            opacity="0.28"
-            transform="rotate(-18 142 454)"
-          />
-
-          {/* Projector base */}
-          <rect
-            x="128" y="469"
-            width="44" height="9"
-            rx="3"
-            fill="#0a0a1c"
-            stroke="#222244"
-            strokeWidth="1"
-          />
-        </g>
-      </svg>
-
-      {/* Hint label */}
+      {/* Hint */}
       <p className={[
-        'text-xs font-mono uppercase tracking-[0.25em] transition-opacity duration-300',
-        state === 'loading' ? 'text-signal-500/60 animate-pulse' : 'text-white/25',
+        'text-[11px] font-mono uppercase tracking-[0.25em] transition-opacity duration-300',
+        state === 'loading' ? 'text-signal-500/70 animate-pulse' : 'text-white/25',
       ].join(' ')}>
-        {state === 'loading' ? 'enviant...' : '— fes click per reportar —'}
+        {state === 'loading' ? 'enviant...' : '— toca per reportar —'}
       </p>
     </div>
   )

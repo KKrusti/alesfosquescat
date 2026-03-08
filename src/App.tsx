@@ -33,7 +33,7 @@ export default function App() {
       const res = await fetch('/api/stats')
       if (res.ok) setStats(await res.json())
     } catch {
-      // stats just won't show — non-critical
+      // non-critical — stats just won't show
     } finally {
       setStatsLoading(false)
     }
@@ -44,9 +44,9 @@ export default function App() {
   const totalThisYear = stats?.total_this_year ?? null
 
   return (
-    <div className="min-h-screen bg-[#050510] relative overflow-x-hidden">
+    <div className="bg-[#050510] relative overflow-x-hidden">
 
-      {/* ── Star field ── */}
+      {/* ── Star field (fixed, full viewport) ── */}
       <svg
         className="fixed inset-0 w-full h-full pointer-events-none"
         xmlns="http://www.w3.org/2000/svg"
@@ -70,82 +70,83 @@ export default function App() {
         ))}
       </svg>
 
-      {/* ── Sky gradient overlay ── */}
+      {/* ── Sky gradient ── */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse 70% 55% at 50% 0%, rgba(15,15,60,0.45) 0%, transparent 100%)',
+            'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(15,15,60,0.5) 0%, transparent 100%)',
         }}
       />
 
       {/* ── Page content ── */}
-      <main className="relative z-10 flex flex-col items-center px-4 pt-10 pb-16 min-h-screen">
+      <main className="relative z-10 flex flex-col items-center px-5 pt-safe pb-safe">
 
-        {/* Header */}
-        <header className="text-center mb-8 animate-fade-in">
+        {/* ── HERO: title + counter + signal ── */}
+        <section className="w-full flex flex-col items-center gap-3 pt-8 pb-6">
+
+          {/* Title */}
           <h1
-            className="text-5xl sm:text-6xl md:text-7xl font-black tracking-[0.06em] text-signal-500 uppercase"
+            className="text-3xl sm:text-5xl md:text-6xl font-black tracking-[0.05em] text-signal-500 uppercase text-center leading-none animate-fade-in"
             style={{
               fontFamily: 'Anton, sans-serif',
-              textShadow: '0 0 40px rgba(251,191,36,0.35), 0 0 80px rgba(251,191,36,0.12)',
+              textShadow: '0 0 30px rgba(251,191,36,0.35)',
             }}
           >
-            ALESFOSQUESCAT
+            ALES FOSQUES CAT
           </h1>
-          <p className="mt-2 text-white/30 font-mono text-xs uppercase tracking-[0.35em]">
-            el comptador de dies sense enllumenat public de Santa Eulàlia de Ronçana
+          <p className="text-white/30 font-mono text-[10px] sm:text-xs uppercase tracking-[0.35em] animate-fade-in">
+            el comptador d&apos;apagons del poble
           </p>
-        </header>
 
-        {/* Big counter */}
-        <div className="text-center mb-6 animate-slide-up" style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
-          {statsLoading ? (
-            <div className="h-24 w-40 bg-white/5 rounded animate-pulse mx-auto" />
-          ) : (
-            <div className="animate-count-in">
-              <div
-                className="text-8xl sm:text-9xl font-black leading-none text-signal-500"
-                style={{
-                  fontFamily: 'Anton, sans-serif',
-                  textShadow: '0 0 50px rgba(252,211,77,0.5)',
-                }}
-              >
-                {totalThisYear ?? '—'}
+          {/* Main counter */}
+          <div
+            className="text-center mt-1 animate-slide-up"
+            style={{ animationDelay: '80ms', animationFillMode: 'both' }}
+          >
+            {statsLoading ? (
+              <div className="h-20 w-32 bg-white/5 rounded-lg animate-pulse mx-auto" />
+            ) : (
+              <div className="animate-count-in">
+                <div
+                  className="text-7xl sm:text-8xl font-black leading-none text-signal-500"
+                  style={{
+                    fontFamily: 'Anton, sans-serif',
+                    textShadow: '0 0 40px rgba(252,211,77,0.45)',
+                  }}
+                >
+                  {totalThisYear ?? '—'}
+                </div>
+                <p className="mt-1.5 text-white/40 font-mono text-xs uppercase tracking-[0.25em]">
+                  dies sense llum aquest any
+                </p>
               </div>
-              <p className="mt-2 text-white/45 font-mono text-sm uppercase tracking-[0.3em]">
-                dies sense llum aquest any
-              </p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Bat Signal */}
-        <div
-          className="my-2 animate-fade-in"
-          style={{ animationDelay: '200ms', animationFillMode: 'both' }}
-        >
-          <BatSignal onSuccess={fetchStats} />
-        </div>
+          {/* Bat Signal — hero element */}
+          <div
+            className="animate-fade-in"
+            style={{ animationDelay: '160ms', animationFillMode: 'both' }}
+          >
+            <BatSignal onSuccess={fetchStats} />
+          </div>
+        </section>
 
-        {/* Divider */}
-        <div className="w-full max-w-2xl my-6 border-t border-white/8" />
-
-        {/* Stats section */}
+        {/* ── STATS ── */}
         <section
-          className="w-full max-w-2xl animate-slide-up"
-          style={{ animationDelay: '350ms', animationFillMode: 'both' }}
+          className="w-full max-w-lg animate-slide-up border-t border-white/8 pt-6 pb-8"
+          style={{ animationDelay: '300ms', animationFillMode: 'both' }}
         >
-          <h2 className="text-center text-xs font-mono text-white/25 uppercase tracking-[0.45em] mb-4">
+          <h2 className="text-center text-[10px] font-mono text-white/25 uppercase tracking-[0.45em] mb-4">
             estadístiques
           </h2>
           <Stats stats={stats} loading={statsLoading} />
         </section>
 
-        {/* Footer */}
-        <footer className="mt-auto pt-10 text-center">
-          <p className="text-white/15 font-mono text-xs tracking-widest">
-            alesfosquescat — {new Date().getFullYear()}
+        <footer className="pb-4 text-center">
+          <p className="text-white/15 font-mono text-[10px] tracking-widest">
+            ales fosques cat — {new Date().getFullYear()}
           </p>
         </footer>
       </main>

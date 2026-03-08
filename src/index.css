@@ -9,6 +9,7 @@
 
   html {
     scroll-behavior: smooth;
+    height: -webkit-fill-available;
   }
 
   body {
@@ -17,41 +18,31 @@
     font-family: 'JetBrains Mono', monospace;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+    /* Remove grey tap flash on iOS/Android */
+    -webkit-tap-highlight-color: transparent;
+    /* Prevent rubber-band scroll on iOS */
+    overscroll-behavior: none;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
 }
 
-/* ─── SVG fill animation (can't be in Tailwind keyframes) ─── */
+/* ─── Safe area utilities (iOS notch / home bar) ─── */
 
-@keyframes flash-letter {
-  0%, 100% {
-    fill: #fcd34d;
-    filter: drop-shadow(0 0 8px rgba(252, 211, 77, 0.6));
-  }
-  16%, 50%, 83% {
-    fill: #ffffff;
-    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.9));
-  }
-  33%, 66% {
-    fill: #fcd34d;
-    filter: drop-shadow(0 0 8px rgba(252, 211, 77, 0.6));
-  }
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+.pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 0px), 1.5rem); }
+
+/* ─── Prevents double-tap zoom on the signal image ─── */
+
+.touch-signal {
+  touch-action: manipulation;
 }
 
-.bat-letter-flash {
-  animation: flash-letter 2s ease-in-out forwards;
-}
-
-/* ─── Bat signal oscillation pivot ─── */
-
-.bat-signal-group {
-  transform-box: fill-box;
-}
-
-/* ─── prefers-reduced-motion override ─── */
+/* ─── prefers-reduced-motion ─── */
 
 @media (prefers-reduced-motion: reduce) {
-  .bat-signal-group,
-  .bat-signal-group * {
-    animation: none !important;
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

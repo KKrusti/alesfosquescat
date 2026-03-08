@@ -149,7 +149,6 @@ func resolveHandler(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	today := todayInMadrid()
-	ipHash := sha256hex(clientIP(r))
 
 	// ── Llegir incident_start i longest_streak actuals ───────────────────
 	var incidentStart sql.NullString
@@ -176,9 +175,9 @@ func resolveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	_, err = db.Exec(`
 		INSERT INTO daily_votes (ip_hash, date, action, incident_start_saved)
-		VALUES ($1, $2, 'resolve', $3)
+		VALUES ('community', $1, 'resolve', $2)
 		ON CONFLICT (ip_hash, date, action) DO NOTHING
-	`, ipHash, today, savedStart)
+	`, today, savedStart)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		writeJSON(w, map[string]string{"error": "failed to record resolve"})
@@ -212,12 +211,6 @@ func resolveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Eliminar el vot 'report' de l'IP per permetre re-reportar ────────
-	_, _ = db.Exec(
-		`DELETE FROM daily_votes WHERE ip_hash = $1 AND date = $2 AND action = 'report'`,
-		ipHash, today,
-	)
-
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{"resolved": true, "date": today})
 }
@@ -245,12 +238,12 @@ func calcStreak(startDate string) int {
 // ── /api/stats ────────────────────────────────────────────────────────────────
 
 type StatsResponse struct {
-	TotalThisYear           int    `json:"total_this_year"`
-	LongestIncidentStreak   int    `json:"longest_incident_streak"`
-	DaysSinceLastIncident   int    `json:"days_since_last_incident"`
-	LastIncidentDate        string `json:"last_incident_date"`
-	LongestNoIncidentStreak int    `json:"longest_no_incident_streak"`
-	CurrentIncidentStreak   int    `json:"current_incident_streak"`
+	TotalThisYear         int    `json:"total_this_year"`
+	LongestIncidentStreak int    `json:"longest_incident_streak"`
+	DaysSinceLastIncident int    `json:"days_since_last_incident"`
+	LastIncidentDate      string `json:"last_incident_date"`
+	NormalDaysThisYear    int    `json:"normal_days_this_year"`
+	CurrentIncidentStreak int    `json:"current_incident_streak"`
 }
 
 func statsHandler(w http.ResponseWriter, r *http.Request) {
@@ -332,10 +325,11 @@ func computeStats(dates []time.Time, now time.Time) StatsResponse {
 	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, loc)
 	todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
+	daysElapsed := int(todayMidnight.Sub(yearStart).Hours()/24) + 1
+
 	if len(dates) == 0 {
-		days := int(todayMidnight.Sub(yearStart).Hours()/24) + 1
-		s.DaysSinceLastIncident = days
-		s.LongestNoIncidentStreak = days
+		s.DaysSinceLastIncident = daysElapsed
+		s.NormalDaysThisYear = daysElapsed
 		return s
 	}
 
@@ -364,18 +358,11 @@ func computeStats(dates []time.Time, now time.Time) StatsResponse {
 	}
 	s.LongestIncidentStreak = maxStreak
 
-	maxGap := int(normalDay(dates[0]).Sub(yearStart).Hours() / 24)
-	for i := 1; i < len(dates); i++ {
-		prev := normalDay(dates[i-1])
-		this := normalDay(dates[i])
-		if gap := int(this.Sub(prev).Hours()/24) - 1; gap > maxGap {
-			maxGap = gap
-		}
+	normalDays := daysElapsed - len(dates)
+	if normalDays < 0 {
+		normalDays = 0
 	}
-	if s.DaysSinceLastIncident > maxGap {
-		maxGap = s.DaysSinceLastIncident
-	}
-	s.LongestNoIncidentStreak = maxGap
+	s.NormalDaysThisYear = normalDays
 
 	return s
 }

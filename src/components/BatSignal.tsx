@@ -172,7 +172,7 @@ export function BatSignal({ onSuccess }: Props) {
               aria-label="Toca per marcar que la llum ha tornat"
               className={[
                 'block select-none rounded-xl',
-                'w-[min(42vw,180px)] sm:w-44',
+                'w-[min(21vw,90px)] sm:w-[88px]',
                 'transition-[opacity,transform] duration-150',
                 isResolvable
                   ? 'cursor-pointer active:opacity-70 active:scale-[0.96]'

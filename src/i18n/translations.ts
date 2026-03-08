@@ -17,7 +17,7 @@ export const translations = {
     daysSinceLabel:   "nits des de l'últim incident",
     badgeActive:      'Ratxa actual',
     badgeOk:          'Tot bé',
-    longestLabel:     'ratxa de nits més llarga sense llum',
+    longestLabel:     'ratxa més llarga de nits sense llum',
     recordBadge:      'Rècord',
 
     // Stats rows
@@ -96,7 +96,7 @@ export const translations = {
     daysSinceLabel: 'noches desde el último incidente',
     badgeActive:    'Racha actual',
     badgeOk:        'Todo bien',
-    longestLabel:   'racha de noches más larga sin luz',
+    longestLabel:   'racha más larga de noches sin luz',
     recordBadge:    'Récord',
 
     // Stats rows

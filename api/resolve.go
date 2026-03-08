@@ -15,9 +15,14 @@ import (
 )
 
 // Handler — POST /api/resolve
-// Marca la fi d'un apagón: posa current_streak a 0 i desa el valor anterior
-// a streak_before_resolve. Elimina el vot de l'IP que resol per permetre
-// que pugui tornar a reportar si s'ha equivocat.
+// Marca la fi d'un apagón:
+//   - Llegeix incident_start actual de streak_state.
+//   - Insereix una fila a daily_votes amb action='resolve' i incident_start_saved=incident_start,
+//     de manera que si l'usuari torna a reportar el mateix dia, report.go pot restaurar
+//     la data original sense cap lògica de backup a streak_state.
+//   - Actualitza longest_streak si el streak actual el supera.
+//   - Posa incident_start = NULL per indicar que no hi ha apagón actiu.
+//
 // L'incident queda a la taula incidents (no s'esborra) per preservar l'historial.
 func Handler(w http.ResponseWriter, r *http.Request) {
 	setCORSHeaders(w, "POST, OPTIONS")
@@ -44,42 +49,101 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	today := todayInMadrid()
 	ipHash := sha256hex(clientIP(r))
 
-	// ── Eliminar el vot de l'IP per permetre re-reportar ─────────────────
-	_, err = db.Exec(
-		`DELETE FROM daily_votes WHERE ip_hash = $1 AND date = $2`,
-		ipHash, today,
-	)
-	if err != nil {
+	// ── Llegir incident_start i longest_streak actuals ───────────────────
+	var incidentStart sql.NullString
+	var longestStreak int
+	err = db.QueryRow(
+		`SELECT to_char(incident_start, 'YYYY-MM-DD'), longest_streak FROM streak_state WHERE id = 1`,
+	).Scan(&incidentStart, &longestStreak)
+	if err != nil && err != sql.ErrNoRows {
 		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to clear vote"})
+		writeJSON(w, map[string]string{"error": "failed to read streak state"})
 		return
 	}
 
-	// ── Guardar current_streak i posar-lo a 0 ────────────────────────────
-	// Si current_streak > 0 actualitzem streak_before_resolve amb el valor
-	// actual. Si ja és 0 mantenim l'últim streak_before_resolve vàlid per
-	// no sobreescriure'l en cas de doble clic.
+	// ── Calcular el streak actual ─────────────────────────────────────────
+	currentStreak := 0
+	if incidentStart.Valid && incidentStart.String != "" {
+		currentStreak = calcStreak(incidentStart.String)
+	}
+
+	// ── Inserir fila resolve a daily_votes amb incident_start_saved ───────
+	// ON CONFLICT DO NOTHING: si l'usuari fa doble clic a resoldre, ignorem.
+	// incident_start_saved és NULL si el streak ja estava inactiu.
+	var savedStart interface{}
+	if incidentStart.Valid && incidentStart.String != "" {
+		savedStart = incidentStart.String
+	}
 	_, err = db.Exec(`
-		UPDATE streak_state
-		   SET streak_before_resolve = CASE WHEN current_streak > 0
-		                                    THEN current_streak
-		                                    ELSE streak_before_resolve
-		                               END,
-		       current_streak        = 0,
-		       updated_at            = NOW()
-		 WHERE id = 1
-	`)
+		INSERT INTO daily_votes (ip_hash, date, action, incident_start_saved)
+		VALUES ($1, $2, 'resolve', $3)
+		ON CONFLICT (ip_hash, date, action) DO NOTHING
+	`, ipHash, today, savedStart)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": "failed to record resolve"})
+		return
+	}
+
+	// ── Actualitzar streak_state ──────────────────────────────────────────
+	if currentStreak > 0 {
+		newLongest := longestStreak
+		if currentStreak > newLongest {
+			newLongest = currentStreak
+		}
+		_, err = db.Exec(`
+			UPDATE streak_state
+			   SET longest_streak = $1,
+			       incident_start = NULL,
+			       updated_at     = NOW()
+			 WHERE id = 1
+		`, newLongest)
+	} else {
+		// Streak ja era inactiu (doble clic o estat inconsistent).
+		_, err = db.Exec(`
+			UPDATE streak_state
+			   SET incident_start = NULL,
+			       updated_at     = NOW()
+			 WHERE id = 1
+		`)
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		writeJSON(w, map[string]string{"error": "failed to update streak"})
 		return
 	}
 
+	// ── Eliminar el vot 'report' de l'IP per permetre re-reportar ────────
+	_, _ = db.Exec(
+		`DELETE FROM daily_votes WHERE ip_hash = $1 AND date = $2 AND action = 'report'`,
+		ipHash, today,
+	)
+
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{
 		"resolved": true,
 		"date":     today,
 	})
+}
+
+// calcStreak retorna (avui - startDate + 1) en dies. startDate és "YYYY-MM-DD".
+func calcStreak(startDate string) int {
+	loc, _ := time.LoadLocation("Europe/Madrid")
+	if loc == nil {
+		loc = time.UTC
+	}
+	start, err := time.ParseInLocation("2006-01-02", startDate, loc)
+	if err != nil {
+		return 0
+	}
+	now := time.Now().In(loc)
+	todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	startMid := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
+	days := int(todayMid.Sub(startMid).Hours()/24) + 1
+	if days < 1 {
+		return 0
+	}
+	return days
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

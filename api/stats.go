@@ -50,11 +50,33 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().In(loc)
 
-	// ── Read streak counters ──────────────────────────────────────────
-	var currentStreak, longestStreak int
+	// ── Read streak state ─────────────────────────────────────────────
+	// incident_start: data d'inici de l'apagón actiu (NULL si no n'hi ha).
+	// longest_streak: màxim historial guardat (actualitzat en resoldre).
+	// El current_streak es calcula en temps real com (avui - incident_start + 1).
+	var incidentStart sql.NullTime
+	var longestStored int
 	_ = db.QueryRow(
-		`SELECT current_streak, longest_streak FROM streak_state WHERE id = 1`,
-	).Scan(&currentStreak, &longestStreak)
+		`SELECT incident_start, longest_streak FROM streak_state WHERE id = 1`,
+	).Scan(&incidentStart, &longestStored)
+
+	// Calcular current streak dinàmicament
+	currentStreak := 0
+	if incidentStart.Valid {
+		todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+		startIn := incidentStart.Time.In(loc)
+		startMid := time.Date(startIn.Year(), startIn.Month(), startIn.Day(), 0, 0, 0, 0, loc)
+		days := int(todayMid.Sub(startMid).Hours()/24) + 1
+		if days > 0 {
+			currentStreak = days
+		}
+	}
+
+	// longest és el màxim entre l'historial guardat i el streak actiu actual
+	longestStreak := longestStored
+	if currentStreak > longestStreak {
+		longestStreak = currentStreak
+	}
 
 	// ── Read incident dates for date-based stats ──────────────────────
 	rows, err := db.Query(

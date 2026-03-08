@@ -73,9 +73,10 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
+	// ── Duplicate-vote check (action='report') ────────────────────────
 	var alreadyVoted bool
 	err = db.QueryRow(
-		`SELECT EXISTS(SELECT 1 FROM daily_votes WHERE ip_hash=$1 AND date=$2)`,
+		`SELECT EXISTS(SELECT 1 FROM daily_votes WHERE ip_hash=$1 AND date=$2 AND action='report')`,
 		ipHash, today,
 	).Scan(&alreadyVoted)
 	if err != nil {
@@ -92,58 +93,52 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := db.Exec(
+	if _, err = db.Exec(
 		`INSERT INTO incidents (date) VALUES ($1) ON CONFLICT (date) DO NOTHING`,
 		today,
-	)
-	if err != nil {
+	); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		writeJSON(w, map[string]string{"error": "failed to record incident"})
 		return
 	}
 
-	// ── Actualitzar streak counter ───────────────────────────────────────
-	rowsInserted, _ := result.RowsAffected()
-
-	var currentStreak, streakBeforeResolve int
+	// ── Activar streak si estava inactiu ─────────────────────────────
+	var incidentStart sql.NullString
 	_ = db.QueryRow(
-		`SELECT current_streak, streak_before_resolve FROM streak_state WHERE id = 1`,
-	).Scan(&currentStreak, &streakBeforeResolve)
+		`SELECT to_char(incident_start, 'YYYY-MM-DD') FROM streak_state WHERE id = 1`,
+	).Scan(&incidentStart)
 
-	if currentStreak == 0 {
-		newStreak := streakBeforeResolve
-		if newStreak == 0 {
-			newStreak = 1
+	if !incidentStart.Valid || incidentStart.String == "" {
+		var resolveStart sql.NullString
+		_ = db.QueryRow(`
+			SELECT to_char(incident_start_saved, 'YYYY-MM-DD')
+			  FROM daily_votes
+			 WHERE ip_hash = $1 AND date = $2 AND action = 'resolve'
+			 LIMIT 1
+		`, ipHash, today).Scan(&resolveStart)
+
+		var activateFrom string
+		if resolveStart.Valid && resolveStart.String != "" {
+			activateFrom = resolveStart.String
+		} else {
+			activateFrom = today
 		}
+
 		if _, err = db.Exec(`
-			INSERT INTO streak_state (id, current_streak, longest_streak, streak_before_resolve)
-			VALUES (1, $1, $1, 0)
+			INSERT INTO streak_state (id, incident_start, updated_at)
+			VALUES (1, $1, NOW())
 			ON CONFLICT (id) DO UPDATE
-			  SET current_streak        = $1,
-			      longest_streak        = GREATEST(streak_state.longest_streak, $1),
-			      streak_before_resolve = 0,
-			      updated_at            = NOW()
-		`, newStreak); err != nil {
+			  SET incident_start = $1,
+			      updated_at     = NOW()
+		`, activateFrom); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			writeJSON(w, map[string]string{"error": "failed to update streak"})
-			return
-		}
-	} else if rowsInserted == 1 {
-		if _, err = db.Exec(`
-			UPDATE streak_state
-			   SET current_streak = current_streak + 1,
-			       longest_streak = GREATEST(longest_streak, current_streak + 1),
-			       updated_at     = NOW()
-			 WHERE id = 1
-		`); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			writeJSON(w, map[string]string{"error": "failed to update streak"})
+			writeJSON(w, map[string]string{"error": "failed to activate streak"})
 			return
 		}
 	}
 
 	if _, err = db.Exec(
-		`INSERT INTO daily_votes (ip_hash, date) VALUES ($1, $2)`,
+		`INSERT INTO daily_votes (ip_hash, date, action) VALUES ($1, $2, 'report')`,
 		ipHash, today,
 	); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -182,35 +177,95 @@ func resolveHandler(w http.ResponseWriter, r *http.Request) {
 	today := todayInMadrid()
 	ipHash := sha256hex(clientIP(r))
 
-	// Eliminar el vot de l'IP per permetre re-reportar
-	_, err = db.Exec(
-		`DELETE FROM daily_votes WHERE ip_hash = $1 AND date = $2`,
-		ipHash, today,
-	)
-	if err != nil {
+	// ── Llegir incident_start i longest_streak actuals ───────────────────
+	var incidentStart sql.NullString
+	var longestStreak int
+	err = db.QueryRow(
+		`SELECT to_char(incident_start, 'YYYY-MM-DD'), longest_streak FROM streak_state WHERE id = 1`,
+	).Scan(&incidentStart, &longestStreak)
+	if err != nil && err != sql.ErrNoRows {
 		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to clear vote"})
+		writeJSON(w, map[string]string{"error": "failed to read streak state"})
 		return
 	}
 
+	// ── Calcular el streak actual ─────────────────────────────────────────
+	currentStreak := 0
+	if incidentStart.Valid && incidentStart.String != "" {
+		currentStreak = calcStreak(incidentStart.String)
+	}
+
+	// ── Inserir fila resolve a daily_votes amb incident_start_saved ───────
+	var savedStart interface{}
+	if incidentStart.Valid && incidentStart.String != "" {
+		savedStart = incidentStart.String
+	}
 	_, err = db.Exec(`
-		UPDATE streak_state
-		   SET streak_before_resolve = CASE WHEN current_streak > 0
-		                                    THEN current_streak
-		                                    ELSE streak_before_resolve
-		                               END,
-		       current_streak        = 0,
-		       updated_at            = NOW()
-		 WHERE id = 1
-	`)
+		INSERT INTO daily_votes (ip_hash, date, action, incident_start_saved)
+		VALUES ($1, $2, 'resolve', $3)
+		ON CONFLICT (ip_hash, date, action) DO NOTHING
+	`, ipHash, today, savedStart)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": "failed to record resolve"})
+		return
+	}
+
+	// ── Actualitzar streak_state ──────────────────────────────────────────
+	if currentStreak > 0 {
+		newLongest := longestStreak
+		if currentStreak > newLongest {
+			newLongest = currentStreak
+		}
+		_, err = db.Exec(`
+			UPDATE streak_state
+			   SET longest_streak = $1,
+			       incident_start = NULL,
+			       updated_at     = NOW()
+			 WHERE id = 1
+		`, newLongest)
+	} else {
+		_, err = db.Exec(`
+			UPDATE streak_state
+			   SET incident_start = NULL,
+			       updated_at     = NOW()
+			 WHERE id = 1
+		`)
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		writeJSON(w, map[string]string{"error": "failed to update streak"})
 		return
 	}
 
+	// ── Eliminar el vot 'report' de l'IP per permetre re-reportar ────────
+	_, _ = db.Exec(
+		`DELETE FROM daily_votes WHERE ip_hash = $1 AND date = $2 AND action = 'report'`,
+		ipHash, today,
+	)
+
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{"resolved": true, "date": today})
+}
+
+// calcStreak retorna (avui - startDate + 1) en dies. startDate és "YYYY-MM-DD".
+func calcStreak(startDate string) int {
+	loc, _ := time.LoadLocation("Europe/Madrid")
+	if loc == nil {
+		loc = time.UTC
+	}
+	start, err := time.ParseInLocation("2006-01-02", startDate, loc)
+	if err != nil {
+		return 0
+	}
+	now := time.Now().In(loc)
+	todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	startMid := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
+	days := int(todayMid.Sub(startMid).Hours()/24) + 1
+	if days < 1 {
+		return 0
+	}
+	return days
 }
 
 // ── /api/stats ────────────────────────────────────────────────────────────────
@@ -252,10 +307,22 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().In(loc)
 
-	var currentStreak, longestStreak int
+	// ── Llegir incident_start i longest_streak ───────────────────────────
+	var incidentStartStr sql.NullString
+	var longestStored int
 	_ = db.QueryRow(
-		`SELECT current_streak, longest_streak FROM streak_state WHERE id = 1`,
-	).Scan(&currentStreak, &longestStreak)
+		`SELECT to_char(incident_start, 'YYYY-MM-DD'), longest_streak FROM streak_state WHERE id = 1`,
+	).Scan(&incidentStartStr, &longestStored)
+
+	currentStreak := 0
+	if incidentStartStr.Valid && incidentStartStr.String != "" {
+		currentStreak = calcStreak(incidentStartStr.String)
+	}
+
+	longestStreak := longestStored
+	if currentStreak > longestStreak {
+		longestStreak = currentStreak
+	}
 
 	rows, err := db.Query(
 		`SELECT date FROM incidents WHERE EXTRACT(YEAR FROM date) = $1 ORDER BY date ASC`,
@@ -395,7 +462,6 @@ func loadDotEnv(path string) {
 		parts := strings.SplitN(line, "=", 2)
 		key := strings.TrimSpace(parts[0])
 		val := strings.TrimSpace(parts[1])
-		// Elimina comillas dobles o simples envolventes
 		if len(val) >= 2 && ((val[0] == '"' && val[len(val)-1] == '"') || (val[0] == '\'' && val[len(val)-1] == '\'')) {
 			val = val[1 : len(val)-1]
 		}

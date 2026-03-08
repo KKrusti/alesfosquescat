@@ -146,7 +146,7 @@ export function BatSignal({ onSuccess }: Props) {
         <div className="flex flex-col items-center gap-1.5">
           <div className={`relative touch-signal ${containerAnim}`}>
             {state === 'success' && (
-              <div className="absolute inset-0 rounded-[18px] bg-white/30 animate-pulse pointer-events-none z-10" />
+              <div className="absolute inset-0 rounded-[18px] bg-white/30 dark:bg-amber-400/15 animate-pulse pointer-events-none z-10" />
             )}
             <img
               src="/signal.png"

@@ -43,7 +43,7 @@ export function LegalPage() {
         <div className="mt-10">
           <a
             href="/"
-            className="px-5 py-2.5 rounded border border-amber-600/30 dark:border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-500/15 transition-colors"
+            className="px-5 py-2.5 rounded border border-amber-600/30 dark:border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-500/15 dark:hover:bg-amber-500/12 transition-colors"
           >
             ← Tornar a l&apos;inici
           </a>
@@ -51,7 +51,7 @@ export function LegalPage() {
       </main>
 
       <footer className="py-5 border-t border-stone-200 dark:border-white/6 text-center">
-        <p className="text-stone-300 dark:text-white/15 text-[10px] tracking-widest">
+        <p className="text-stone-400 dark:text-white/15 text-[10px] tracking-widest">
           alesfosquestcat · Santa Eulàlia de Ronçana · {new Date().getFullYear()}
         </p>
       </footer>

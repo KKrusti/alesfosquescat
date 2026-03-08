@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -51,13 +52,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// Try to serve from cache if it is still fresh.
+	// Try to serve from cache if it is still fresh and contains all required fields.
 	var cachedRaw string
 	var updatedAt time.Time
 	cacheErr := db.QueryRow(
 		`SELECT data::text, updated_at FROM weather_cache WHERE id = 1`,
 	).Scan(&cachedRaw, &updatedAt)
-	if cacheErr == nil && time.Since(updatedAt) < cacheMaxAge {
+	cacheValid := cacheErr == nil &&
+		time.Since(updatedAt) < cacheMaxAge &&
+		strings.Contains(cachedRaw, `"prob"`)
+	if cacheValid {
 		_, _ = w.Write([]byte(cachedRaw))
 		return
 	}

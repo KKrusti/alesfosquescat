@@ -36,7 +36,7 @@ export function WeatherAlert() {
           {message}
         </p>
         <p className="text-sky-600/70 dark:text-sky-400/50 text-[11px] mt-1 font-mono tracking-wide">
-          {data.prob}% · {data.mm.toFixed(1)} mm
+          {data.prob > 0 ? `${data.prob}% · ` : ''}{data.mm.toFixed(1)} mm
         </p>
       </div>
     </div>

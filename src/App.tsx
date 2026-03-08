@@ -3,27 +3,6 @@ import { BatSignal } from './components/BatSignal'
 import { Stats } from './components/Stats'
 import type { StatsResponse } from './types'
 
-// ── Deterministic star field (seeded PRNG — stable across renders) ──────────
-function mulberry32(seed: number) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-interface Star { x: number; y: number; r: number; delay: number; opacity: number }
-
-const rng = mulberry32(0xdeadbeef)
-const STARS: Star[] = Array.from({ length: 55 }, () => ({
-  x: rng() * 100,
-  y: rng() * 100,
-  r: 0.15 + rng() * 0.45,
-  delay: rng() * 5,
-  opacity: 0.3 + rng() * 0.7,
-}))
-
 export default function App() {
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
@@ -32,121 +11,109 @@ export default function App() {
     try {
       const res = await fetch('/api/stats')
       if (res.ok) setStats(await res.json())
-    } catch {
-      // non-critical — stats just won't show
-    } finally {
-      setStatsLoading(false)
-    }
+    } catch { /* non-critical */ }
+    finally { setStatsLoading(false) }
   }, [])
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
-  const totalThisYear = stats?.total_this_year ?? null
+  const total = stats?.total_this_year ?? null
 
   return (
-    <div className="bg-[#050510] relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#0d0d1c]">
 
-      {/* ── Star field (fixed, full viewport) ── */}
-      <svg
-        className="fixed inset-0 w-full h-full pointer-events-none"
-        xmlns="http://www.w3.org/2000/svg"
-        preserveAspectRatio="xMidYMid slice"
-        viewBox="0 0 100 100"
-        aria-hidden="true"
-      >
-        {STARS.map((s, i) => (
-          <circle
-            key={i}
-            cx={s.x}
-            cy={s.y}
-            r={s.r}
-            fill="white"
-            opacity={s.opacity}
-            style={{
-              animation: `twinkle ${2.5 + s.delay}s ease-in-out infinite`,
-              animationDelay: `${s.delay}s`,
-            }}
-          />
-        ))}
-      </svg>
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-20 bg-[#0d0d1c]/95 backdrop-blur-sm border-b border-white/8 pt-safe">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
 
-      {/* ── Sky gradient ── */}
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(15,15,60,0.5) 0%, transparent 100%)',
-        }}
-      />
+          {/* Amber accent stripe — the visual signature of the layout */}
+          <div className="w-[3px] self-stretch bg-amber-400 rounded-full shrink-0" />
 
-      {/* ── Page content ── */}
-      <main className="relative z-10 flex flex-col items-center px-5 pt-safe pb-safe">
-
-        {/* ── HERO: title + counter + signal ── */}
-        <section className="w-full flex flex-col items-center gap-3 pt-8 pb-6">
-
-          {/* Title */}
-          <h1
-            className="text-3xl sm:text-5xl md:text-6xl font-black tracking-[0.05em] text-signal-500 uppercase text-center leading-none animate-fade-in"
-            style={{
-              fontFamily: 'Anton, sans-serif',
-              textShadow: '0 0 30px rgba(251,191,36,0.35)',
-            }}
-          >
-            ALES FOSQUES CAT
-          </h1>
-          <p className="text-white/30 font-mono text-[10px] sm:text-xs uppercase tracking-[0.35em] animate-fade-in">
-            el comptador d&apos;apagons del poble
-          </p>
-
-          {/* Main counter */}
-          <div
-            className="text-center mt-1 animate-slide-up"
-            style={{ animationDelay: '80ms', animationFillMode: 'both' }}
-          >
-            {statsLoading ? (
-              <div className="h-20 w-32 bg-white/5 rounded-lg animate-pulse mx-auto" />
-            ) : (
-              <div className="animate-count-in">
-                <div
-                  className="text-7xl sm:text-8xl font-black leading-none text-signal-500"
-                  style={{
-                    fontFamily: 'Anton, sans-serif',
-                    textShadow: '0 0 40px rgba(252,211,77,0.45)',
-                  }}
-                >
-                  {totalThisYear ?? '—'}
-                </div>
-                <p className="mt-1.5 text-white/40 font-mono text-xs uppercase tracking-[0.25em]">
-                  dies sense llum aquest any
-                </p>
-              </div>
-            )}
+          <div className="flex-1 min-w-0">
+            <p className="text-amber-400 font-bold text-[15px] leading-tight tracking-tight">
+              alesfosquestcat
+            </p>
+            <p className="text-white/35 text-[11px] leading-tight mt-0.5">
+              Santa Eulàlia de Ronçana
+            </p>
           </div>
 
-          {/* Bat Signal — hero element */}
-          <div
-            className="animate-fade-in"
-            style={{ animationDelay: '160ms', animationFillMode: 'both' }}
-          >
+          {/* Live indicator */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-amber-500/25 bg-amber-500/8 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-[10px] text-amber-400/80 uppercase tracking-widest font-medium">
+              en directe
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Content ─────────────────────────────────────────────────── */}
+      <main className="max-w-lg mx-auto px-4 pb-safe">
+
+        {/* ── Estat actual ── */}
+        <section className="pt-5 pb-4">
+          <p className="section-label">Estat actual</p>
+
+          <div className="status-card">
+            {/* Left colored bar */}
+            <div className="w-[3px] self-stretch bg-amber-400 rounded-full shrink-0 my-0.5" />
+
+            <div className="flex-1 min-w-0">
+              {statsLoading ? (
+                <div className="space-y-2">
+                  <div className="h-14 w-24 bg-white/6 rounded animate-pulse" />
+                  <div className="h-3 w-36 bg-white/4 rounded animate-pulse" />
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="text-6xl sm:text-7xl font-black leading-none text-amber-400"
+                    style={{ fontFamily: 'Anton, sans-serif' }}
+                  >
+                    {total ?? '—'}
+                  </div>
+                  <p className="text-white/40 text-xs mt-1.5 tracking-wide">
+                    dies sense llum · {new Date().getFullYear()}
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Status badge */}
+            <div className="shrink-0 self-start mt-0.5">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded border border-amber-500/20 bg-amber-500/8">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <span className="text-[10px] text-amber-400/70 uppercase tracking-wider whitespace-nowrap">
+                  Apagons
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="section-divider" />
+
+        {/* ── Reportar ── */}
+        <section className="py-5">
+          <p className="section-label">Reportar incidència</p>
+          <div className="flex flex-col items-center">
             <BatSignal onSuccess={fetchStats} />
           </div>
         </section>
 
-        {/* ── STATS ── */}
-        <section
-          className="w-full max-w-lg animate-slide-up border-t border-white/8 pt-6 pb-8"
-          style={{ animationDelay: '300ms', animationFillMode: 'both' }}
-        >
-          <h2 className="text-center text-[10px] font-mono text-white/25 uppercase tracking-[0.45em] mb-4">
-            estadístiques
-          </h2>
+        <div className="section-divider" />
+
+        {/* ── Estadístiques ── */}
+        <section className="py-5">
+          <p className="section-label">Dades anuals</p>
           <Stats stats={stats} loading={statsLoading} />
         </section>
 
-        <footer className="pb-4 text-center">
-          <p className="text-white/15 font-mono text-[10px] tracking-widest">
-            ales fosques cat — {new Date().getFullYear()}
+        {/* Footer */}
+        <footer className="py-5 border-t border-white/6 text-center">
+          <p className="text-white/15 text-[10px] tracking-widest">
+            alesfosquestcat · Santa Eulàlia de Ronçana · {new Date().getFullYear()}
           </p>
         </footer>
       </main>

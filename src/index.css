@@ -3,46 +3,59 @@
 @tailwind utilities;
 
 @layer base {
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
+  *, *::before, *::after { box-sizing: border-box; }
 
-  html {
-    scroll-behavior: smooth;
-    height: -webkit-fill-available;
-  }
+  html { height: -webkit-fill-available; }
 
   body {
-    background: #050510;
+    background: #0d0d1c;
     color: #ffffff;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
-    /* Remove grey tap flash on iOS/Android */
     -webkit-tap-highlight-color: transparent;
-    /* Prevent rubber-band scroll on iOS */
     overscroll-behavior: none;
     min-height: 100vh;
     min-height: -webkit-fill-available;
   }
 }
 
-/* ─── Safe area utilities (iOS notch / home bar) ─── */
+/* ─── Safe area (iOS notch / home bar) ─── */
+.pt-safe  { padding-top:    env(safe-area-inset-top, 0px); }
+.pb-safe  { padding-bottom: max(env(safe-area-inset-bottom, 0px), 1rem); }
 
-.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
-.pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 0px), 1.5rem); }
-
-/* ─── Prevents double-tap zoom on the signal image ─── */
-
-.touch-signal {
-  touch-action: manipulation;
+/* ─── Reusable institutional primitives ─── */
+.section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4em;
+  color: rgba(251, 191, 36, 0.45);
+  margin-bottom: 14px;
 }
 
-/* ─── prefers-reduced-motion ─── */
+.section-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+}
 
+.status-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: rgba(251, 191, 36, 0.04);
+  border: 1px solid rgba(251, 191, 36, 0.14);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+/* ─── Touch target ─── */
+.touch-signal { touch-action: manipulation; }
+
+/* ─── prefers-reduced-motion ─── */
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

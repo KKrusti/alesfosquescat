@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Satirical web app tracking power outages in Santa Eulàlia de Ronçana. Stack: React 18 + TypeScript + Tailwind (frontend) + Go serverless functions (backend) + Neon Postgres (DB), deployed on Vercel.
 
 Communication
-Always communicate with the user in Spanish, regardless of the language used in code, comments, or commit messages.
+Always communicate with the user in Spanish, the language used in code, comments, or commit messages has to be always in English.
 
 ## Commands
 

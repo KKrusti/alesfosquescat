@@ -101,9 +101,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		_ = db.QueryRow(`
 			SELECT to_char(incident_start_saved, 'YYYY-MM-DD')
 			  FROM daily_votes
-			 WHERE ip_hash = $1 AND date = $2 AND action = 'resolve'
+			 WHERE date = $1 AND action = 'resolve'
 			 LIMIT 1
-		`, ipHash, today).Scan(&resolveStart)
+		`, today).Scan(&resolveStart)
 
 		var activateFrom string
 		if resolveStart.Valid && resolveStart.String != "" {

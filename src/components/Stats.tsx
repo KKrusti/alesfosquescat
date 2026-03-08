@@ -14,7 +14,7 @@ interface StatItem {
 const STAT_ITEMS: StatItem[] = [
   { key: 'total_this_year',           label: 'Nits sense llum',          text: 'text-amber-700 dark:text-amber-400' },
   { key: 'longest_incident_streak',   label: 'Ratxa màx. sense llum',    text: 'text-amber-600 dark:text-yellow-300' },
-  { key: 'longest_no_incident_streak',label: 'Ratxa màx. sense apagades', text: 'text-sky-600 dark:text-sky-400' },
+  { key: 'normal_days_this_year',      label: 'Nits amb normalitat',       text: 'text-sky-600 dark:text-sky-400' },
 ]
 
 function StatRow({ item, value, index }: { item: StatItem; value: number; index: number }) {

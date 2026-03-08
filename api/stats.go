@@ -12,12 +12,12 @@ import (
 
 // StatsResponse is the JSON payload returned by GET /api/stats.
 type StatsResponse struct {
-	TotalThisYear           int    `json:"total_this_year"`
-	LongestIncidentStreak   int    `json:"longest_incident_streak"`
-	DaysSinceLastIncident   int    `json:"days_since_last_incident"`
-	LastIncidentDate        string `json:"last_incident_date"`
-	LongestNoIncidentStreak int    `json:"longest_no_incident_streak"`
-	CurrentIncidentStreak   int    `json:"current_incident_streak"`
+	TotalThisYear         int    `json:"total_this_year"`
+	LongestIncidentStreak int    `json:"longest_incident_streak"`
+	DaysSinceLastIncident int    `json:"days_since_last_incident"`
+	LastIncidentDate      string `json:"last_incident_date"`
+	NormalDaysThisYear    int    `json:"normal_days_this_year"`
+	CurrentIncidentStreak int    `json:"current_incident_streak"`
 }
 
 // Handler — GET /api/stats
@@ -117,10 +117,12 @@ func computeStats(dates []time.Time, now time.Time) StatsResponse {
 	// Medianoche d'avui en timezone Madrid (Truncate opera en UTC, no en local)
 	todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
+	// Dies transcorreguts des de l'1 de gener fins avui (inclusiu)
+	daysElapsed := int(todayMidnight.Sub(yearStart).Hours()/24) + 1
+
 	if len(dates) == 0 {
-		daysSinceYearStart := int(todayMidnight.Sub(yearStart).Hours()/24) + 1
-		s.DaysSinceLastIncident = daysSinceYearStart
-		s.LongestNoIncidentStreak = daysSinceYearStart
+		s.DaysSinceLastIncident = daysElapsed
+		s.NormalDaysThisYear = daysElapsed
 		return s
 	}
 
@@ -168,25 +170,13 @@ func computeStats(dates []time.Time, now time.Time) StatsResponse {
 		s.CurrentIncidentStreak = cur
 	}
 
-	// ── Longest gap without incidents (max consecutive clean days) ────
-	// Gap before first incident
-	maxGap := int(normalDay(dates[0]).Sub(yearStart).Hours() / 24)
-
-	// Gaps between consecutive incidents
-	for i := 1; i < len(dates); i++ {
-		prev := normalDay(dates[i-1])
-		this := normalDay(dates[i])
-		gap := int(this.Sub(prev).Hours()/24) - 1
-		if gap > maxGap {
-			maxGap = gap
-		}
+	// ── Dies amb normalitat aquest any ───────────────────────────────
+	// Dies transcorreguts des de l'1 de gener fins avui, menys les nits amb incident.
+	normalDays := daysElapsed - len(dates)
+	if normalDays < 0 {
+		normalDays = 0
 	}
-
-	// Gap from last incident to today
-	if s.DaysSinceLastIncident > maxGap {
-		maxGap = s.DaysSinceLastIncident
-	}
-	s.LongestNoIncidentStreak = maxGap
+	s.NormalDaysThisYear = normalDays
 
 	return s
 }

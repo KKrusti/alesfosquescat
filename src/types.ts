@@ -3,7 +3,7 @@ export interface StatsResponse {
   longest_incident_streak: number
   days_since_last_incident: number
   last_incident_date: string
-  longest_no_incident_streak: number
+  normal_days_this_year: number
   current_incident_streak: number
 }
 

@@ -40,6 +40,7 @@ func main() {
 	mux.HandleFunc("/api/stats", statsHandler)
 	mux.HandleFunc("/api/resolve", resolveHandler)
 	mux.HandleFunc("/api/history", historyHandler)
+	mux.HandleFunc("/api/interactions", interactionsHandler)
 
 	addr := ":8787"
 	log.Printf("API dev server → http://localhost%s\n", addr)
@@ -120,6 +121,8 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"error": "failed to activate streak"})
 		return
 	}
+
+	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('report')`)
 
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{"success": true, "restored": restored, "date": today})
@@ -211,6 +214,8 @@ func resolveHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"error": "failed to update streak"})
 		return
 	}
+
+	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('resolve')`)
 
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{"resolved": true, "date": today})
@@ -497,6 +502,66 @@ func historyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, periods)
+}
+
+// ── /api/interactions ──────────────────────────────────────────────────────────
+
+func interactionsHandler(w http.ResponseWriter, r *http.Request) {
+	setCORSHeaders(w, "GET, OPTIONS")
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeJSON(w, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	db, err := openDB()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": "db connection failed"})
+		return
+	}
+	defer db.Close()
+
+	loc, _ := time.LoadLocation("Europe/Madrid")
+	if loc == nil {
+		loc = time.UTC
+	}
+
+	rows, err := db.Query(
+		`SELECT action, created_at FROM interaction_log ORDER BY created_at DESC LIMIT 100`,
+	)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": "query failed"})
+		return
+	}
+	defer rows.Close()
+
+	type Entry struct {
+		Action string `json:"action"`
+		At     string `json:"at"`
+	}
+	entries := []Entry{}
+	for rows.Next() {
+		var action string
+		var createdAt time.Time
+		if err := rows.Scan(&action, &createdAt); err != nil {
+			continue
+		}
+		entries = append(entries, Entry{
+			Action: action,
+			At:     createdAt.In(loc).Format("02-01-2006 15:04"),
+		})
+	}
+
+	w.WriteHeader(http.StatusOK)
+	writeJSON(w, entries)
 }
 
 // loadDotEnv lee variables de entorno desde un archivo .env (formato KEY="VALUE")

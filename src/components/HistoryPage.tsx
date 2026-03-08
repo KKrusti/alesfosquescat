@@ -6,6 +6,11 @@ interface IncidentPeriod {
   days: number
 }
 
+interface InteractionEntry {
+  action: 'report' | 'resolve'
+  at: string // "DD-MM-YYYY HH:mm" already formatted server-side
+}
+
 function formatDate(iso: string): string {
   return iso.split('-').reverse().join('-')
 }
@@ -19,17 +24,35 @@ function SkeletonRow() {
   )
 }
 
+function ActivitySkeletonRow() {
+  return (
+    <div className="flex items-center gap-3 py-3 px-3 border-b border-stone-200 dark:border-white/7">
+      <div className="w-2 h-2 rounded-full bg-stone-200 dark:bg-white/7 shrink-0 animate-pulse" />
+      <div className="h-3 w-36 bg-stone-200 dark:bg-white/7 rounded animate-pulse" />
+      <div className="h-3 w-24 bg-stone-200 dark:bg-white/7 rounded animate-pulse ml-auto" />
+    </div>
+  )
+}
+
 export function HistoryPage() {
   const { t } = useLanguage()
-  const [periods, setPeriods] = useState<IncidentPeriod[]>([])
-  const [loading, setLoading] = useState(true)
+  const [periods, setPeriods]           = useState<IncidentPeriod[]>([])
+  const [interactions, setInteractions] = useState<InteractionEntry[]>([])
+  const [loadingPeriods, setLoadingPeriods]           = useState(true)
+  const [loadingInteractions, setLoadingInteractions] = useState(true)
 
   useEffect(() => {
     fetch('/api/history')
       .then(r => r.ok ? r.json() : [])
       .then(setPeriods)
       .catch(() => setPeriods([]))
-      .finally(() => setLoading(false))
+      .finally(() => setLoadingPeriods(false))
+
+    fetch('/api/interactions')
+      .then(r => r.ok ? r.json() : [])
+      .then(setInteractions)
+      .catch(() => setInteractions([]))
+      .finally(() => setLoadingInteractions(false))
   }, [])
 
   return (
@@ -47,47 +70,89 @@ export function HistoryPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8">
-        <p className="section-label mb-6">{t.historyTitle}</p>
+      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8 space-y-10">
 
-        <div>
-          {loading ? (
-            Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
-          ) : periods.length === 0 ? (
-            <p className="text-stone-400 dark:text-white/25 text-[13px] py-6 text-center">
-              {t.historyEmpty}
-            </p>
-          ) : (
-            periods.map((p, i) => {
-              const label = p.days === 1 ? t.historyDaySingle : t.historyDayPlural
-              return (
-                <div
-                  key={i}
-                  className="flex items-center justify-between py-3.5 border-b border-stone-200 dark:border-white/7"
-                >
-                  <span className="text-[13px] text-stone-500 dark:text-white/50 font-mono">
-                    {formatDate(p.start_date)}
-                  </span>
-                  <span
-                    className="text-xl font-black leading-none text-amber-700 dark:text-amber-400 shrink-0 ml-4"
-                    style={{ fontFamily: 'Anton, sans-serif' }}
+        {/* ── Incident periods ── */}
+        <section>
+          <p className="section-label mb-4">{t.historyTitle}</p>
+          <div>
+            {loadingPeriods ? (
+              Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
+            ) : periods.length === 0 ? (
+              <p className="text-stone-400 dark:text-white/25 text-[13px] py-6 text-center">
+                {t.historyEmpty}
+              </p>
+            ) : (
+              periods.map((p, i) => {
+                const label = p.days === 1 ? t.historyDaySingle : t.historyDayPlural
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between py-3.5 border-b border-stone-200 dark:border-white/7"
                   >
-                    {p.days} <span className="text-[11px] font-normal tracking-wide">{label}</span>
-                  </span>
-                </div>
-              )
-            })
-          )}
-        </div>
+                    <span className="text-[13px] text-stone-500 dark:text-white/50 font-mono">
+                      {formatDate(p.start_date)}
+                    </span>
+                    <span
+                      className="text-xl font-black leading-none text-amber-700 dark:text-amber-400 shrink-0 ml-4"
+                      style={{ fontFamily: 'Anton, sans-serif' }}
+                    >
+                      {p.days} <span className="text-[11px] font-normal tracking-wide">{label}</span>
+                    </span>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </section>
 
-        <div className="mt-10">
-          <a
-            href="/"
-            className="px-5 py-2.5 rounded border border-amber-600/30 dark:border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-500/15 dark:hover:bg-amber-500/12 transition-colors"
-          >
-            {t.historyBack}
-          </a>
-        </div>
+        {/* ── Activity feed ── */}
+        <section>
+          <p className="section-label mb-4">{t.historyActivityTitle}</p>
+          <div className="max-h-[336px] overflow-y-auto overscroll-contain rounded-lg border border-stone-200 dark:border-white/7">
+            {loadingInteractions ? (
+              Array.from({ length: 6 }).map((_, i) => <ActivitySkeletonRow key={i} />)
+            ) : interactions.length === 0 ? (
+              <p className="text-stone-400 dark:text-white/25 text-[13px] py-6 text-center">
+                {t.historyActivityEmpty}
+              </p>
+            ) : (
+              interactions.map((entry, i) => {
+                const isReport = entry.action === 'report'
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-3 py-3 px-3 ${i < interactions.length - 1 ? 'border-b border-stone-200 dark:border-white/7' : ''}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${
+                      isReport
+                        ? 'bg-amber-500 dark:bg-amber-400'
+                        : 'bg-emerald-500 dark:bg-emerald-400'
+                    }`} />
+                    <span className={`text-[13px] ${
+                      isReport
+                        ? 'text-amber-700 dark:text-amber-400'
+                        : 'text-emerald-700 dark:text-emerald-400'
+                    }`}>
+                      {isReport ? t.historyActionReport : t.historyActionResolve}
+                    </span>
+                    <span className="text-[11px] text-stone-400 dark:text-white/25 font-mono tabular-nums ml-auto">
+                      {entry.at}
+                    </span>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </section>
+
+        <a
+          href="/"
+          className="inline-block px-5 py-2.5 rounded border border-amber-600/30 dark:border-amber-500/30 bg-amber-500/8 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-500/15 dark:hover:bg-amber-500/12 transition-colors"
+        >
+          {t.historyBack}
+        </a>
+
       </main>
 
       <footer className="py-5 border-t border-stone-200 dark:border-white/6 text-center">

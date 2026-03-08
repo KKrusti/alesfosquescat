@@ -58,8 +58,18 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   PRIMARY KEY (ip_hash, endpoint, window)
 );
 
+-- tabla interaction_log: registre de cada acció de reportar/resoldre.
+--   Permet mostrar un historial d'activitat amb hora del servidor (Europe/Madrid).
+--   No s'associa a cap IP; és un log públic i anònim.
+CREATE TABLE IF NOT EXISTS interaction_log (
+  id         SERIAL PRIMARY KEY,
+  action     TEXT        NOT NULL, -- 'report' | 'resolve'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Índexs per rendiment
 CREATE INDEX IF NOT EXISTS idx_incidents_date      ON incidents(date);
 CREATE INDEX IF NOT EXISTS idx_daily_votes_date    ON daily_votes(date);
 CREATE INDEX IF NOT EXISTS idx_daily_votes_hash    ON daily_votes(ip_hash);
-CREATE INDEX IF NOT EXISTS idx_rate_limits_window  ON rate_limits(window);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_window       ON rate_limits(window);
+CREATE INDEX IF NOT EXISTS idx_interaction_log_created  ON interaction_log(created_at DESC);

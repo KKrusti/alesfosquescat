@@ -64,7 +64,11 @@ export const translations = {
     historyDaySingle:  'nit',
     historyDayPlural:  'nits',
     historyLinkLabel:  'Mur de la vergonya →',
-    historyBack:       '← Tornar',
+    historyBack:           '← Tornar',
+    historyActivityTitle:  'Activitat recent',
+    historyActivityEmpty:  'Sense activitat registrada',
+    historyActionReport:   'Apagada reportada',
+    historyActionResolve:  'Llum restaurada',
 
     // Legal page
     legalTitle:    'Avís legal',
@@ -139,7 +143,11 @@ export const translations = {
     historyDaySingle:  'noche',
     historyDayPlural:  'noches',
     historyLinkLabel:  'Muro de la vergüenza →',
-    historyBack:       '← Volver',
+    historyBack:           '← Volver',
+    historyActivityTitle:  'Actividad reciente',
+    historyActivityEmpty:  'Sin actividad registrada',
+    historyActionReport:   'Apagón reportado',
+    historyActionResolve:  'Luz restaurada',
 
     // Legal page
     legalTitle:    'Aviso legal',

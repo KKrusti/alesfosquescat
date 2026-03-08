@@ -107,6 +107,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Best-effort log — do not block the response if this fails
+	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('resolve')`)
+
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{
 		"resolved": true,

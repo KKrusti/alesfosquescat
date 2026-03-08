@@ -24,6 +24,7 @@ type WeatherResponse struct {
 	Alert     bool    `json:"alert"`
 	DaysUntil int     `json:"days_until"`
 	MM        float64 `json:"mm"`
+	Prob      int     `json:"prob"`
 }
 
 // Handler — GET /api/weather
@@ -117,21 +118,27 @@ func fetchWeather() (*WeatherResponse, error) {
 		return nil, err
 	}
 
-	result := &WeatherResponse{}
-	for i := range payload.Daily.Time {
-		if i >= len(payload.Daily.PrecipitationSum) || i >= len(payload.Daily.PrecipitationProbMax) {
+	result := parseWeatherAlert(
+		payload.Daily.Time,
+		payload.Daily.PrecipitationSum,
+		payload.Daily.PrecipitationProbMax,
+	)
+	return &result, nil
+}
+
+// parseWeatherAlert scans daily forecast slices and returns the first day that
+// exceeds both the rain threshold and the probability threshold.
+// Pure function — no I/O, safe to unit-test directly.
+func parseWeatherAlert(times []string, sums []float64, probs []int) WeatherResponse {
+	for i := range times {
+		if i >= len(sums) || i >= len(probs) {
 			break
 		}
-		mm := payload.Daily.PrecipitationSum[i]
-		prob := payload.Daily.PrecipitationProbMax[i]
-		if mm > rainMM && prob > rainProbPct {
-			result.Alert = true
-			result.DaysUntil = i
-			result.MM = mm
-			break
+		if sums[i] > rainMM && probs[i] > rainProbPct {
+			return WeatherResponse{Alert: true, DaysUntil: i, MM: sums[i], Prob: probs[i]}
 		}
 	}
-	return result, nil
+	return WeatherResponse{}
 }
 
 // ── helpers (duplicated per vercel-go per-file isolation requirement) ─────────

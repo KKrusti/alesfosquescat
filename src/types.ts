@@ -11,6 +11,7 @@ export interface WeatherResponse {
   alert: boolean
   days_until: number
   mm: number
+  prob: number
 }
 
 export type AnimState =

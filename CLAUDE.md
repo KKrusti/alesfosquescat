@@ -9,6 +9,58 @@ Satirical web app tracking power outages in Santa Eulàlia de Ronçana. Stack: R
 Communication
 Always communicate with the user in Spanish, the language used in code, comments, or commit messages has to be always in English.
 
+## Testing — MANDATORY RULE
+
+**Tests are non-negotiable.** Every new feature or bug fix MUST include unit tests. No implementation is considered done without passing tests.
+
+### Rules
+
+1. **Write tests before marking a task complete.** If you add or change logic, you add or change tests.
+2. **Run all tests after every implementation** — both frontend and backend. Do not stop at build passing.
+3. **Tests must pass with zero failures.** A red test suite blocks the task.
+4. If an existing test breaks due to your changes, fix the test (or the code) before finishing.
+
+### Frontend tests
+
+```bash
+npm test                # run all tests once (CI mode)
+npm run test:watch      # watch mode during development
+```
+
+Test files live next to their component: `src/components/__tests__/Foo.test.tsx`
+
+Framework: **Vitest + React Testing Library + jsdom**
+
+### Backend tests (Go)
+
+Because vercel-go compiles each `.go` file in isolation, test each file independently:
+
+```bash
+cd api
+go test weather.go weather_test.go -v
+go test stats.go   stats_test.go   -v
+go test report.go  report_test.go  -v
+```
+
+**Never run `go test ./...`** — the duplicate helper functions across handlers cause compile errors.
+
+Test files: `api/*_test.go` — same package (`package handler`), table-driven tests.
+
+### What to test
+
+| Layer | Test | Method |
+|---|---|---|
+| Go pure functions | `computeStats`, `parseWeatherAlert`, `sha256hex`, `clientIP` | Table-driven unit tests |
+| React components | Render output, conditional display, fetch mocking, user events | RTL + `vi.fn()` |
+| API integration | Not tested locally — covered by vercel-go compilation + manual `vercel dev` |
+
+### What NOT to test
+
+- Functions that only wrap DB or HTTP calls (`openDB`, the Handler itself) — mock or skip
+- Styling/CSS classes — test behaviour, not class names
+
+---
+
 ## Commands
 
 ## Skills

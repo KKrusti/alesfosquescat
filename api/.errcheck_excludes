@@ -1,0 +1,4 @@
+# Deferred Close errors are non-actionable in serverless handlers.
+# The connection/rows are already fully used at this point.
+(*database/sql.DB).Close
+(*database/sql.Rows).Close

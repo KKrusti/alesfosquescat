@@ -1,0 +1,27 @@
+# golangci-lint cannot lint this module as a package because each api/*.go
+# file is a self-contained Vercel serverless function compiled in isolation
+# (package handler with duplicate symbols across files).
+#
+# Use api/lint.sh instead, which runs `go vet FILE.go` on each file.
+#
+# This file is kept for reference and future use if the architecture changes.
+linters:
+  enable:
+    - errcheck
+    - goimports
+    - revive
+    - govet
+    - staticcheck
+
+linters-settings:
+  goimports:
+    local-prefixes: alesfosquescat/api
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: error-return
+      - name: error-strings
+
+run:
+  timeout: 5m

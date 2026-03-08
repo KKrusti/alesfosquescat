@@ -11,7 +11,7 @@ export function LegalPage() {
           <div className="w-[3px] self-stretch bg-amber-600/40 dark:bg-amber-400/40 rounded-full shrink-0" />
           <div className="flex-1 min-w-0">
             <a href="/" className="text-amber-700/70 dark:text-amber-400/60 font-bold text-[15px] leading-tight hover:text-amber-700 dark:hover:text-amber-400 transition-colors">
-              alesfosquestcat
+              alesfosquescat
             </a>
             <p className="text-stone-400 dark:text-white/20 text-[11px] leading-tight mt-0.5">Santa Eulàlia de Ronçana</p>
           </div>
@@ -49,7 +49,7 @@ export function LegalPage() {
 
       <footer className="py-5 border-t border-stone-200 dark:border-white/6 text-center">
         <p className="text-stone-400 dark:text-white/15 text-[10px] tracking-widest">
-          alesfosquestcat · Santa Eulàlia de Ronçana · {new Date().getFullYear()}
+          alesfosquescat · Santa Eulàlia de Ronçana · {new Date().getFullYear()}
         </p>
       </footer>
     </div>

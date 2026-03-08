@@ -188,7 +188,10 @@ func openDB() (*sql.DB, error) {
 }
 
 func setCORSHeaders(w http.ResponseWriter, methods string) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if origin := os.Getenv("ALLOWED_ORIGIN"); origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Vary", "Origin")
+	}
 	w.Header().Set("Access-Control-Allow-Methods", methods)
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 }

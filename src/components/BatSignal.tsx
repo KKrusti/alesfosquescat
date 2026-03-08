@@ -53,6 +53,10 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
           onSuccess()
           setTimeout(() => { setState('idle'); setMessage(null) }, 3000)
         }
+      } else if (res.status === 429) {
+        setState('already_voted')
+        setMessage(t.msgRateLimit)
+        setTimeout(() => { setState('idle'); setMessage(null) }, 4000)
       } else if (res.status >= 500) {
         setState('server_error')
         setMessage(t.msgServerError)

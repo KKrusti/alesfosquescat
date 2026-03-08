@@ -18,13 +18,16 @@ const LanguageContext = createContext<LanguageContextValue>({
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLang] = useState<Lang>(() => {
     const stored = localStorage.getItem('afc_lang')
-    return stored === 'es' ? 'es' : 'ca'
+    const initial: Lang = stored === 'es' ? 'es' : 'ca'
+    document.documentElement.lang = initial
+    return initial
   })
 
   const toggle = () => {
     setLang(prev => {
       const next: Lang = prev === 'ca' ? 'es' : 'ca'
       localStorage.setItem('afc_lang', next)
+      document.documentElement.lang = next
       return next
     })
   }

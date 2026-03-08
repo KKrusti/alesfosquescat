@@ -35,12 +35,13 @@ export function BatSignal({ onSuccess }: Props) {
 
     if (getCookie('afc_voted') === getToday()) {
       alreadyVotedHits.current++
-      const msg = alreadyVotedHits.current > 1
+      const isSpam = alreadyVotedHits.current > 1
+      const msg = isSpam
         ? 'Per molt que insisteixis, la llum no tornarà abans (per desgràcia)'
         : 'Gràcies, un altre veí ja ha reportat l\'incidència d\'avui'
       setState('already_voted')
       setMessage(msg)
-      setTimeout(() => { setState('idle'); setMessage(null) }, 2800)
+      setTimeout(() => { setState('idle'); setMessage(null) }, isSpam ? 5500 : 2800)
       return
     }
 

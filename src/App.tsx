@@ -184,12 +184,27 @@ export default function App() {
           <p className="text-white/20 text-[10px] tracking-wide">
             Sàtira · Humor · Veïns indignats 🕯️
           </p>
-          <a
-            href="/legal"
-            className="inline-block text-white/20 text-[10px] tracking-widest hover:text-amber-400/50 transition-colors"
-          >
-            Avís legal
-          </a>
+          <div className="flex items-center justify-center gap-4">
+            <a
+              href="/legal"
+              className="text-white/20 text-[10px] tracking-widest hover:text-amber-400/50 transition-colors"
+            >
+              Avís legal
+            </a>
+            <a
+              href="https://www.instagram.com/ajstaeulaliaderoncana/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram de l'Ajuntament de Santa Eulàlia de Ronçana"
+              className="text-white/20 hover:text-amber-400/50 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                <circle cx="12" cy="12" r="4"/>
+                <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" stroke="none"/>
+              </svg>
+            </a>
+          </div>
         </footer>
       </main>
     </div>

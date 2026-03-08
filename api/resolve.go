@@ -67,8 +67,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if alreadyResolved {
-		w.WriteHeader(http.StatusConflict)
-		writeJSON(w, map[string]interface{}{"already_resolved": true})
+		// L'estat ja és correcte (streak NULL), retornem 200 perquè el frontend
+		// no mostri error. El streak_state no es torna a tocar.
+		w.WriteHeader(http.StatusOK)
+		writeJSON(w, map[string]interface{}{"resolved": true, "date": today})
 		return
 	}
 

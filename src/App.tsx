@@ -125,8 +125,8 @@ export default function App() {
                     </div>
                     <p className="text-stone-500 dark:text-white/40 text-xs mt-1.5 tracking-wide">
                       {hasActiveStreak
-                        ? 'dies consecutius sense llum'
-                        : 'dies des de l\'últim incident'}
+                        ? 'nits consecutives sense llum'
+                        : 'nits des de l\'últim incident'}
                     </p>
                   </>
                 )}

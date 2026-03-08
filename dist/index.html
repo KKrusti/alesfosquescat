@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="ca">
   <head>
+    <!-- Prevent FOUC: apply theme class before React mounts -->
+    <script>if(localStorage.getItem('afc_theme')!=='light')document.documentElement.classList.add('dark')</script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,8 +17,8 @@
       href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@400;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/index-R6OQHDZV.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-D022SfEO.css">
+    <script type="module" crossorigin src="/assets/index-B1zO7aB0.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index--0orit86.css">
   </head>
   <body>
     <div id="root"></div>

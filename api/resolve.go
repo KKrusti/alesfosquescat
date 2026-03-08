@@ -49,6 +49,29 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	today := todayInMadrid()
 	ipHash := sha256hex(clientIP(r))
 
+	// ── Rate limit: max 5 peticions per IP per minut ─────────────────
+	if exceeded, err := checkRateLimit(db, ipHash, "resolve", 5); err == nil && exceeded {
+		w.WriteHeader(http.StatusTooManyRequests)
+		writeJSON(w, map[string]string{"error": "massa peticions, espera un minut"})
+		return
+	}
+
+	// ── Ja ha resolt avui? Evita actualitzar streak_state dues vegades ───
+	var alreadyResolved bool
+	if err = db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM daily_votes WHERE ip_hash=$1 AND date=$2 AND action='resolve')`,
+		ipHash, today,
+	).Scan(&alreadyResolved); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": "resolve check failed"})
+		return
+	}
+	if alreadyResolved {
+		w.WriteHeader(http.StatusConflict)
+		writeJSON(w, map[string]interface{}{"already_resolved": true})
+		return
+	}
+
 	// ── Llegir incident_start i longest_streak actuals ───────────────────
 	var incidentStart sql.NullString
 	var longestStreak int
@@ -153,7 +176,10 @@ func openDB() (*sql.DB, error) {
 }
 
 func setCORSHeaders(w http.ResponseWriter, methods string) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if origin := os.Getenv("ALLOWED_ORIGIN"); origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Vary", "Origin")
+	}
 	w.Header().Set("Access-Control-Allow-Methods", methods)
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 }
@@ -162,11 +188,13 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+// clientIP returns the real client IP. On Vercel, the platform appends the
+// real client IP as the last entry in X-Forwarded-For, so we read the
+// rightmost entry to prevent spoofing via client-controlled prepended IPs.
 func clientIP(r *http.Request) string {
-	for _, h := range []string{"CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP"} {
-		if val := r.Header.Get(h); val != "" {
-			return strings.TrimSpace(strings.SplitN(val, ",", 2)[0])
-		}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[len(parts)-1])
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -186,4 +214,29 @@ func todayInMadrid() string {
 		loc = time.UTC
 	}
 	return time.Now().In(loc).Format("2006-01-02")
+}
+
+func checkRateLimit(db *sql.DB, ipHash, endpoint string, maxPerMinute int) (bool, error) {
+	loc, _ := time.LoadLocation("Europe/Madrid")
+	if loc == nil {
+		loc = time.UTC
+	}
+	now := time.Now().In(loc)
+	window := now.Format("2006-01-02T15:04")
+	cutoff := now.Add(-10 * time.Minute).Format("2006-01-02T15:04")
+
+	_, _ = db.Exec(`DELETE FROM rate_limits WHERE window < $1`, cutoff)
+
+	var count int
+	err := db.QueryRow(`
+		INSERT INTO rate_limits (ip_hash, endpoint, window, count)
+		VALUES ($1, $2, $3, 1)
+		ON CONFLICT (ip_hash, endpoint, window)
+		DO UPDATE SET count = rate_limits.count + 1
+		RETURNING count
+	`, ipHash, endpoint, window).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > maxPerMinute, nil
 }

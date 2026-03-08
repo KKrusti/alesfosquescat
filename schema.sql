@@ -47,7 +47,19 @@ ALTER TABLE streak_state ADD COLUMN IF NOT EXISTS longest_streak      INT NOT NU
 -- Seed the single row (noop if already exists)
 INSERT INTO streak_state (id) VALUES (1) ON CONFLICT DO NOTHING;
 
+-- tabla rate_limits: límit de peticions per IP i minut per endpoint.
+--   window: "YYYY-MM-DDTHH:MM" (finestra d'1 minut en Europe/Madrid).
+--   Les files antigues s'esborren automàticament des dels handlers Go.
+CREATE TABLE IF NOT EXISTS rate_limits (
+  ip_hash  TEXT NOT NULL,
+  endpoint TEXT NOT NULL,
+  window   TEXT NOT NULL,
+  count    INT  NOT NULL DEFAULT 1,
+  PRIMARY KEY (ip_hash, endpoint, window)
+);
+
 -- Índexs per rendiment
-CREATE INDEX IF NOT EXISTS idx_incidents_date    ON incidents(date);
-CREATE INDEX IF NOT EXISTS idx_daily_votes_date  ON daily_votes(date);
-CREATE INDEX IF NOT EXISTS idx_daily_votes_hash  ON daily_votes(ip_hash);
+CREATE INDEX IF NOT EXISTS idx_incidents_date      ON incidents(date);
+CREATE INDEX IF NOT EXISTS idx_daily_votes_date    ON daily_votes(date);
+CREATE INDEX IF NOT EXISTS idx_daily_votes_hash    ON daily_votes(ip_hash);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_window  ON rate_limits(window);

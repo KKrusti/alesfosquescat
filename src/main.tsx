@@ -18,6 +18,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="*" element={<ErrorPage />} />
         </Routes>
       </BrowserRouter>
+      <SpeedInsights />
     </ThemeProvider>
   </StrictMode>,
 )

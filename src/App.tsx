@@ -3,8 +3,6 @@ import { BatSignal } from './components/BatSignal'
 import { Stats } from './components/Stats'
 import { useTheme } from './context/ThemeContext'
 import type { StatsResponse } from './types'
-import { SpeedInsights } from "@vercel/speed-insights/react"
-
 // Schedules a one-shot callback at the next local midnight
 function onNextMidnight(cb: () => void): () => void {
   const now = new Date()
@@ -231,7 +229,6 @@ export default function App() {
           </div>
         </footer>
       </main>
-    <SpeedInsights />
     </div>
   )
 }

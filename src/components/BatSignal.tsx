@@ -26,13 +26,15 @@ function getToday(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-type ResolveState = 'idle' | 'loading' | 'success' | 'error'
+type ResolveState = 'idle' | 'loading' | 'success' | 'error' | 'already_resolved'
 
 export function BatSignal({ onSuccess }: Props) {
   const [state, setState] = useState<AnimState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [resolveState, setResolveState] = useState<ResolveState>('idle')
+  const [resolveMessage, setResolveMessage] = useState<string | null>(null)
   const alreadyVotedHits = useRef(0)
+  const resolvedToday = useRef(false)
 
   const handleClick = useCallback(async () => {
     if (state === 'loading') return
@@ -92,12 +94,22 @@ export function BatSignal({ onSuccess }: Props) {
 
   const handleResolve = useCallback(async () => {
     if (resolveState === 'loading') return
+
+    // Spam guard: ja s'ha resolt avui
+    if (resolvedToday.current) {
+      setResolveState('already_resolved')
+      setResolveMessage('L\'alcalde ja sap que és un miracle, no cal insistir')
+      setTimeout(() => { setResolveState('idle'); setResolveMessage(null) }, 3500)
+      return
+    }
+
     setResolveState('loading')
     try {
       const res = await fetch('/api/resolve', { method: 'POST' })
       if (res.ok) {
         deleteCookie('afc_voted')
         alreadyVotedHits.current = 0
+        resolvedToday.current = true
         setResolveState('success')
         onSuccess()
         setTimeout(() => setResolveState('idle'), 3000)
@@ -209,10 +221,15 @@ export function BatSignal({ onSuccess }: Props) {
         </div>
       )}
 
-      {/* Resolve error message */}
+      {/* Resolve state message */}
       {resolveState === 'error' && (
         <div className="px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] border border-red-500/50 bg-red-500/10 dark:bg-red-900/10 text-red-600 dark:text-red-400">
           Error al marcar la resolució
+        </div>
+      )}
+      {resolveState === 'already_resolved' && resolveMessage && (
+        <div className="px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] border border-amber-600/40 dark:border-amber-500/50 bg-amber-500/10 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400">
+          {resolveMessage}
         </div>
       )}
 

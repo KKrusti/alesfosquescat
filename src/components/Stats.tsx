@@ -12,11 +12,9 @@ interface StatItem {
 }
 
 const STAT_ITEMS: StatItem[] = [
-  { key: 'total_this_year',           label: 'Dies sense llum',           text: 'text-amber-400' },
-  { key: 'longest_incident_streak',   label: 'Racha màx. d\'apagons',     text: 'text-yellow-300' },
-  { key: 'days_since_last_incident',  label: 'Dies des del darrer',        text: 'text-emerald-400' },
-  { key: 'longest_no_incident_streak',label: 'Racha màx. sense apagons',  text: 'text-sky-400' },
-  { key: 'current_incident_streak',   label: 'Racha actual d\'apagons',   text: 'text-red-400' },
+  { key: 'total_this_year',           label: 'Dies sense llum',          text: 'text-amber-400' },
+  { key: 'longest_incident_streak',   label: 'Ratxa màx. d\'apagons',    text: 'text-yellow-300' },
+  { key: 'longest_no_incident_streak',label: 'Ratxa màx. sense apagons', text: 'text-sky-400' },
 ]
 
 function StatRow({ item, value, index }: { item: StatItem; value: number; index: number }) {

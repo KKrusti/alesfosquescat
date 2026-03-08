@@ -110,7 +110,7 @@ export function BatSignal({ onSuccess }: Props) {
           className={[
             'block select-none',
             // Size: ~65% viewport width on mobile, capped at 300px on larger screens
-            'w-[min(72vw,300px)] sm:w-80',
+            'w-[min(52vw,220px)] sm:w-56',
             // Press feedback
             'transition-[opacity,transform] duration-150',
             isClickable

@@ -13,7 +13,7 @@ interface StatItem {
 
 const STAT_ITEMS: StatItem[] = [
   { key: 'total_this_year',           label: 'Dies sense llum',          text: 'text-amber-400' },
-  { key: 'longest_incident_streak',   label: 'Ratxa màx. d\'apagons',    text: 'text-yellow-300' },
+  { key: 'longest_incident_streak',   label: 'Ratxa màx. sense llum',    text: 'text-yellow-300' },
   { key: 'longest_no_incident_streak',label: 'Ratxa màx. sense apagons', text: 'text-sky-400' },
 ]
 

@@ -18,7 +18,10 @@ const LanguageContext = createContext<LanguageContextValue>({
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLang] = useState<Lang>(() => {
     const stored = localStorage.getItem('afc_lang')
-    const initial: Lang = stored === 'es' ? 'es' : 'ca'
+    const browserLang = navigator.language.toLowerCase()
+    const initial: Lang = stored === 'es' || stored === 'ca'
+      ? (stored as Lang)
+      : browserLang.startsWith('ca') ? 'ca' : 'es'
     document.documentElement.lang = initial
     return initial
   })

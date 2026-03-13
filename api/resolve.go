@@ -107,14 +107,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Remove today's incident if it was created today — covers same-day false
-	// reports regardless of whether incident_start has already been cleared
-	// (e.g. a previous resolve call ran before this fix was deployed).
-	_, _ = db.Exec(`
-		DELETE FROM incidents
-		 WHERE date = $1
-		   AND to_char(created_at AT TIME ZONE 'Europe/Madrid', 'YYYY-MM-DD') = $1
-	`, today)
+	// Remove today from incidents unconditionally.
+	// Safe because incidents stores only the START DAY of each outage: during a
+	// multi-day outage report.go returns already_active and never inserts today,
+	// so this DELETE is a no-op for real outages. For same-day false reports it
+	// undoes the incident, and it also fixes already-broken state where
+	// incident_start was cleared by a previous resolve but the row was not deleted.
+	_, _ = db.Exec(`DELETE FROM incidents WHERE date = $1`, today)
 
 	// Best-effort log — do not block the response if this fails
 	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('resolve')`)

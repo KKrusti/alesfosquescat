@@ -113,7 +113,7 @@ function IncidentRow({ date, token, onDeleted }: IncidentRowProps) {
       'flex items-center justify-between px-4 py-3 rounded-lg border transition-all duration-300',
       deleteState === 'done'
         ? 'opacity-0 scale-95 border-emerald-500/20 bg-emerald-500/5'
-        : 'border-stone-200 dark:border-white/8 bg-white dark:bg-white/3',
+        : 'border-stone-200 dark:border-white/8 bg-white dark:bg-white/5',
     ].join(' ')}>
       <span className="font-mono text-sm text-stone-700 dark:text-white/70 tabular-nums">
         {date}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTheme } from '../context/ThemeContext'
 
 const TOKEN_KEY = 'admin_token'
 
@@ -169,6 +170,7 @@ function IncidentRow({ date, token, onDeleted }: IncidentRowProps) {
 }
 
 export function AdminPage() {
+  const { theme, toggle } = useTheme()
   const [token, setToken] = useState<string>(() => sessionStorage.getItem(TOKEN_KEY) ?? '')
   const [input, setInput] = useState('')
   const [incidents, setIncidents] = useState<string[]>([])
@@ -233,6 +235,17 @@ export function AdminPage() {
   if (!token) {
     return (
       <div className="min-h-screen bg-stone-100 dark:bg-[#0d0d1c] flex items-center justify-center px-4">
+        <button
+          onClick={toggle}
+          aria-label="Cambiar tema"
+          className="absolute top-4 right-4 p-1.5 rounded border border-stone-200 dark:border-white/10 text-stone-400 dark:text-white/30 hover:text-amber-700 dark:hover:text-amber-400 hover:border-amber-600/30 transition-colors cursor-pointer"
+        >
+          {theme === 'dark' ? (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          )}
+        </button>
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center space-y-1">
             <p className="font-mono text-xs uppercase tracking-[0.3em] text-stone-400 dark:text-white/20">
@@ -291,6 +304,17 @@ export function AdminPage() {
               className="text-[10px] font-mono uppercase tracking-widest text-stone-400 dark:text-white/25 hover:text-amber-600 dark:hover:text-amber-400 transition-colors cursor-pointer"
             >
               Actualizar
+            </button>
+            <button
+              onClick={toggle}
+              aria-label="Cambiar tema"
+              className="p-1.5 rounded border border-stone-200 dark:border-white/10 text-stone-400 dark:text-white/30 hover:text-amber-700 dark:hover:text-amber-400 hover:border-amber-600/30 transition-colors cursor-pointer"
+            >
+              {theme === 'dark' ? (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              )}
             </button>
             <button
               onClick={() => { sessionStorage.removeItem(TOKEN_KEY); setToken('') }}

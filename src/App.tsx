@@ -47,11 +47,20 @@ export default function App() {
   const { lang, t, toggle: toggleLang } = useLanguage()
 
   const fetchStats = useCallback(async () => {
-    try {
-      const res = await fetch('/api/stats')
-      if (res.ok) setStats(await res.json())
-    } catch { /* non-critical */ }
-    finally { setStatsLoading(false) }
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch('/api/stats')
+        if (res.ok) { setStats(await res.json()); break }
+        if (res.status >= 500 && attempt < 2) {
+          await new Promise(r => setTimeout(r, 800))
+          continue
+        }
+        break
+      } catch {
+        if (attempt < 2) await new Promise(r => setTimeout(r, 800))
+      }
+    }
+    setStatsLoading(false)
   }, [])
 
   useEffect(() => { fetchStats() }, [fetchStats])

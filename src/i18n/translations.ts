@@ -39,6 +39,12 @@ export const translations = {
     resolveLabel:     '— resoldre —',
     resolvedLabel:    '✓ resolt',
 
+    // BatSignal — confirmation
+    confirmReport:  '¿Confirmes que hi ha un apagó?',
+    confirmResolve: '¿Confirmes que ha tornat la llum?',
+    confirmYes:     'Sí',
+    confirmNo:      'No',
+
     // BatSignal — feedback messages
     msgAlreadyActive:  'La ratxa ja està activa, gràcies',
     msgRestored:       'Reprenent la ratxa anterior',
@@ -122,6 +128,12 @@ export const translations = {
     resolveSending:   'enviando...',
     resolveLabel:     '— resolver —',
     resolvedLabel:    '✓ resuelto',
+
+    // BatSignal — confirmation
+    confirmReport:  '¿Confirmas que hay un apagón?',
+    confirmResolve: '¿Confirmas que ha vuelto la luz?',
+    confirmYes:     'Sí',
+    confirmNo:      'No',
 
     // BatSignal — feedback messages
     msgAlreadyActive:  'La racha ya está activa, gracias',

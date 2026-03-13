@@ -107,6 +107,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If the incident started today, it was a same-day false report.
+	// Remove today's entry from incidents to restore the normal-day streak.
+	if incidentStart.Valid && incidentStart.String == today {
+		_, _ = db.Exec(`DELETE FROM incidents WHERE date = $1`, today)
+	}
+
 	// Best-effort log — do not block the response if this fails
 	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('resolve')`)
 

@@ -8,6 +8,7 @@ interface Props {
 }
 
 type ResolveState = 'idle' | 'loading' | 'success' | 'error' | 'already_resolved'
+type PendingAction = null | 'report' | 'resolve'
 
 export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
   const { t } = useLanguage()
@@ -15,12 +16,13 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
   const [message, setMessage] = useState<string | null>(null)
   const [resolveState, setResolveState] = useState<ResolveState>('idle')
   const [resolveMessage, setResolveMessage] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const resolvedToday = useRef(false)
 
-  const handleClick = useCallback(async () => {
+  // ── Confirmation step ─────────────────────────────────────────────────────
+  const handleReportClick = useCallback(() => {
     if (state === 'loading') return
 
-    // If streak is already active, nothing to report
     if (hasActiveStreak) {
       setState('already_voted')
       setMessage(t.msgAlreadyActive)
@@ -28,6 +30,28 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
       return
     }
 
+    setPendingAction('report')
+  }, [state, hasActiveStreak, t])
+
+  const handleResolveClick = useCallback(() => {
+    if (resolveState === 'loading') return
+
+    if (resolvedToday.current) {
+      setResolveState('already_resolved')
+      setResolveMessage(t.msgAlreadyResolved)
+      setTimeout(() => { setResolveState('idle'); setResolveMessage(null) }, 3500)
+      return
+    }
+
+    setPendingAction('resolve')
+  }, [resolveState, t])
+
+  const handleCancel = useCallback(() => {
+    setPendingAction(null)
+  }, [])
+
+  // ── Confirmed: execute API calls ──────────────────────────────────────────
+  const doReport = useCallback(async () => {
     setState('loading')
 
     try {
@@ -43,7 +67,6 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
       if (res.ok) {
         const data = await res.json()
         if (data.already_active) {
-          // Backend safety net: streak became active between the check and the call
           setState('already_voted')
           setMessage(t.msgAlreadyActive)
           setTimeout(() => { setState('idle'); setMessage(null) }, 2800)
@@ -72,19 +95,9 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
       setMessage(isAbort ? t.msgTimeout : t.msgNetworkError)
       setTimeout(() => { setState('idle'); setMessage(null) }, 3500)
     }
-  }, [state, hasActiveStreak, onSuccess, t])
+  }, [onSuccess, t])
 
-  const handleResolve = useCallback(async () => {
-    if (resolveState === 'loading') return
-
-    // Client-side guard: already resolved today in this session
-    if (resolvedToday.current) {
-      setResolveState('already_resolved')
-      setResolveMessage(t.msgAlreadyResolved)
-      setTimeout(() => { setResolveState('idle'); setResolveMessage(null) }, 3500)
-      return
-    }
-
+  const doResolve = useCallback(async () => {
     setResolveState('loading')
     try {
       const res = await fetch('/api/resolve', { method: 'POST' })
@@ -101,10 +114,21 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
       setResolveState('error')
       setTimeout(() => setResolveState('idle'), 3000)
     }
-  }, [resolveState, onSuccess, t])
+  }, [onSuccess])
 
-  const isClickable  = state !== 'loading'
-  const isResolvable = resolveState !== 'loading'
+  const handleConfirm = useCallback(() => {
+    if (pendingAction === 'report') {
+      setPendingAction(null)
+      doReport()
+    } else if (pendingAction === 'resolve') {
+      setPendingAction(null)
+      doResolve()
+    }
+  }, [pendingAction, doReport, doResolve])
+
+  // ── Derived state ─────────────────────────────────────────────────────────
+  const isClickable  = state !== 'loading' && pendingAction === null
+  const isResolvable = resolveState !== 'loading' && pendingAction === null
 
   const containerAnim =
     state === 'already_voted' ? 'animate-shake' :
@@ -115,6 +139,8 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
     state === 'already_voted'
       ? 'border border-amber-600/40 dark:border-amber-500/50 bg-amber-500/10 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400'
       : 'border border-red-500/50 bg-red-500/10 dark:bg-red-900/10 text-red-600 dark:text-red-400'
+
+  const confirmText = pendingAction === 'report' ? t.confirmReport : t.confirmResolve
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -144,8 +170,8 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
                   : 'cursor-wait opacity-50',
                 state === 'loading' ? 'animate-pulse' : '',
               ].join(' ')}
-              onClick={isClickable ? handleClick : undefined}
-              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && isClickable) handleClick() }}
+              onClick={isClickable ? handleReportClick : undefined}
+              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && isClickable) handleReportClick() }}
             />
           </div>
           <p className={[
@@ -178,8 +204,8 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
                   : 'cursor-wait opacity-50',
                 resolveState === 'loading' ? 'animate-pulse' : '',
               ].join(' ')}
-              onClick={isResolvable ? handleResolve : undefined}
-              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && isResolvable) handleResolve() }}
+              onClick={isResolvable ? handleResolveClick : undefined}
+              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && isResolvable) handleResolveClick() }}
             />
           </div>
           <p className={[
@@ -194,20 +220,43 @@ export function BatSignal({ onSuccess, hasActiveStreak }: Props) {
 
       </div>
 
+      {/* ── Inline confirmation ── */}
+      {pendingAction !== null && (
+        <div className="flex flex-col items-center gap-2 px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/8 dark:bg-amber-900/10 w-full max-w-[280px]">
+          <p className="font-mono text-xs text-amber-700 dark:text-amber-400 text-center">
+            {confirmText}
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={handleConfirm}
+              className="px-4 py-1 rounded font-mono text-xs font-bold uppercase tracking-widest bg-amber-500/20 hover:bg-amber-500/35 text-amber-700 dark:text-amber-300 border border-amber-500/40 transition-colors duration-150 cursor-pointer"
+            >
+              {t.confirmYes}
+            </button>
+            <button
+              onClick={handleCancel}
+              className="px-4 py-1 rounded font-mono text-xs font-bold uppercase tracking-widest bg-stone-200/40 hover:bg-stone-200/70 dark:bg-white/5 dark:hover:bg-white/10 text-stone-500 dark:text-white/40 border border-stone-300/40 dark:border-white/10 transition-colors duration-150 cursor-pointer"
+            >
+              {t.confirmNo}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Report state message */}
-      {message && (
+      {message && pendingAction === null && (
         <div className={`px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] ${msgStyle}`}>
           {message}
         </div>
       )}
 
       {/* Resolve state message */}
-      {resolveState === 'error' && (
+      {resolveState === 'error' && pendingAction === null && (
         <div className="px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] border border-red-500/50 bg-red-500/10 dark:bg-red-900/10 text-red-600 dark:text-red-400">
           {t.msgResolveError}
         </div>
       )}
-      {resolveState === 'already_resolved' && resolveMessage && (
+      {resolveState === 'already_resolved' && resolveMessage && pendingAction === null && (
         <div className="px-4 py-2.5 rounded font-mono text-sm font-bold text-center max-w-[280px] border border-amber-600/40 dark:border-amber-500/50 bg-amber-500/10 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400">
           {resolveMessage}
         </div>

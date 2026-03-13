@@ -17,13 +17,8 @@ import (
 // Handler — POST /api/report
 // Records an outage for today.
 //
-// Guard: if a streak is already active (incident_start IS NOT NULL), returns
-// already_active — the frontend uses the live stats to show this before calling.
-//
-// If no active streak:
-//   - If the community resolved today, restores incident_start_saved so the
-//     counter returns to the pre-resolve value (false-resolve correction).
-//   - Otherwise starts a fresh streak from today.
+// If an outage with end_date IS NULL already exists, returns already_active.
+// Otherwise inserts a new incidents row with end_date = NULL (open/active).
 func Handler(w http.ResponseWriter, r *http.Request) {
 	setCORSHeaders(w, "POST, OPTIONS")
 	w.Header().Set("Content-Type", "application/json")
@@ -57,21 +52,22 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Read current streak state ──────────────────────────────────────
-	var incidentStart sql.NullString
-	_ = db.QueryRow(
-		`SELECT to_char(incident_start, 'YYYY-MM-DD') FROM streak_state WHERE id = 1`,
-	).Scan(&incidentStart)
-
-	// If a streak is already active, nothing to do — the frontend shows this
-	// state before even calling the API, but handle it here as a safety net.
-	if incidentStart.Valid && incidentStart.String != "" {
+	// ── Check if an outage is already active (end_date IS NULL) ───────
+	var dummy int
+	err = db.QueryRow(`SELECT 1 FROM incidents WHERE end_date IS NULL LIMIT 1`).Scan(&dummy)
+	if err == nil {
+		// Active outage found — nothing to do
 		w.WriteHeader(http.StatusOK)
 		writeJSON(w, map[string]interface{}{"already_active": true})
 		return
 	}
+	if err != sql.ErrNoRows {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": "failed to check active outage"})
+		return
+	}
 
-	// ── Upsert today's incident ────────────────────────────────────────
+	// ── Insert new incident (open, end_date = NULL) ────────────────────
 	if _, err = db.Exec(
 		`INSERT INTO incidents (date) VALUES ($1) ON CONFLICT (date) DO NOTHING`,
 		today,
@@ -81,45 +77,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Determine streak start: restore if resolved today, else start fresh ──
-	var resolveStart sql.NullString
-	_ = db.QueryRow(`
-		SELECT to_char(incident_start_saved, 'YYYY-MM-DD')
-		  FROM daily_votes
-		 WHERE ip_hash = 'community' AND date = $1 AND action = 'resolve'
-		 LIMIT 1
-	`, today).Scan(&resolveStart)
-
-	restored := resolveStart.Valid && resolveStart.String != ""
-	activateFrom := today
-	if restored {
-		activateFrom = resolveStart.String
-	}
-
-	if _, err = db.Exec(`
-		INSERT INTO streak_state (id, incident_start, updated_at)
-		VALUES (1, $1, NOW())
-		ON CONFLICT (id) DO UPDATE
-		  SET incident_start = $1,
-		      updated_at     = NOW()
-	`, activateFrom); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to activate streak"})
-		return
-	}
-
 	// Best-effort log — do not block the response if this fails
-	logAction := "report"
-	if restored {
-		logAction = "report_restored"
-	}
-	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ($1)`, logAction)
+	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('report')`)
 
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{
-		"success":  true,
-		"restored": restored,
-		"date":     today,
+		"success": true,
+		"date":    today,
 	})
 }
 

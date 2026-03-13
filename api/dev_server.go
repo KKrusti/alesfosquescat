@@ -2,7 +2,7 @@
 
 // Local development server — ignored by `go build ./...` and vercel-go
 // Run with: go run api/dev_server.go   (desde la raíz del proyecto)
-// Serves /api/report, /api/stats, /api/resolve on :8787
+// Serves /api/report, /api/stats, /api/resolve, /api/history, /api/interactions on :8787
 // Vite proxies /api → :8787 (vite.config.ts)
 
 package main
@@ -70,19 +70,21 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	// ── Read current streak state ──────────────────────────────────────
-	var incidentStart sql.NullString
-	_ = db.QueryRow(
-		`SELECT to_char(incident_start, 'YYYY-MM-DD') FROM streak_state WHERE id = 1`,
-	).Scan(&incidentStart)
-
-	// If streak already active, nothing to do
-	if incidentStart.Valid && incidentStart.String != "" {
+	// Check if an outage is already active (end_date IS NULL)
+	var dummy int
+	err = db.QueryRow(`SELECT 1 FROM incidents WHERE end_date IS NULL LIMIT 1`).Scan(&dummy)
+	if err == nil {
 		w.WriteHeader(http.StatusOK)
 		writeJSON(w, map[string]interface{}{"already_active": true})
 		return
 	}
+	if err != sql.ErrNoRows {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": "failed to check active outage"})
+		return
+	}
 
+	// Insert new incident (open, end_date = NULL)
 	if _, err = db.Exec(
 		`INSERT INTO incidents (date) VALUES ($1) ON CONFLICT (date) DO NOTHING`,
 		today,
@@ -92,41 +94,10 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Restore or start fresh ─────────────────────────────────────────
-	var resolveStart sql.NullString
-	_ = db.QueryRow(`
-		SELECT to_char(incident_start_saved, 'YYYY-MM-DD')
-		  FROM daily_votes
-		 WHERE ip_hash = 'community' AND date = $1 AND action = 'resolve'
-		 LIMIT 1
-	`, today).Scan(&resolveStart)
-
-	restored := resolveStart.Valid && resolveStart.String != ""
-	activateFrom := today
-	if restored {
-		activateFrom = resolveStart.String
-	}
-
-	if _, err = db.Exec(`
-		INSERT INTO streak_state (id, incident_start, updated_at)
-		VALUES (1, $1, NOW())
-		ON CONFLICT (id) DO UPDATE
-		  SET incident_start = $1,
-		      updated_at     = NOW()
-	`, activateFrom); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to activate streak"})
-		return
-	}
-
-	logAction := "report"
-	if restored {
-		logAction = "report_restored"
-	}
-	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ($1)`, logAction)
+	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('report')`)
 
 	w.WriteHeader(http.StatusOK)
-	writeJSON(w, map[string]interface{}{"success": true, "restored": restored, "date": today})
+	writeJSON(w, map[string]interface{}{"success": true, "date": today})
 }
 
 // ── /api/resolve ──────────────────────────────────────────────────────────────
@@ -155,91 +126,50 @@ func resolveHandler(w http.ResponseWriter, r *http.Request) {
 
 	today := todayInMadrid()
 
-	// ── Llegir incident_start i longest_streak actuals ───────────────────
-	var incidentStart sql.NullString
-	var longestStreak int
-	err = db.QueryRow(
-		`SELECT to_char(incident_start, 'YYYY-MM-DD'), longest_streak FROM streak_state WHERE id = 1`,
-	).Scan(&incidentStart, &longestStreak)
-	if err != nil && err != sql.ErrNoRows {
-		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to read streak state"})
+	// Find the active (open) incident
+	var incidentID int
+	var startDate string
+	err = db.QueryRow(`
+		SELECT id, to_char(date, 'YYYY-MM-DD')
+		  FROM incidents
+		 WHERE end_date IS NULL
+		 LIMIT 1
+	`).Scan(&incidentID, &startDate)
+
+	if err == sql.ErrNoRows {
+		w.WriteHeader(http.StatusOK)
+		writeJSON(w, map[string]interface{}{"resolved": false, "already_resolved": true})
 		return
 	}
-
-	// ── Calcular el streak actual ─────────────────────────────────────────
-	currentStreak := 0
-	if incidentStart.Valid && incidentStart.String != "" {
-		currentStreak = calcStreak(incidentStart.String)
-	}
-
-	// ── Inserir fila resolve a daily_votes amb incident_start_saved ───────
-	var savedStart interface{}
-	if incidentStart.Valid && incidentStart.String != "" {
-		savedStart = incidentStart.String
-	}
-	_, err = db.Exec(`
-		INSERT INTO daily_votes (ip_hash, date, action, incident_start_saved)
-		VALUES ('community', $1, 'resolve', $2)
-		ON CONFLICT (ip_hash, date, action) DO NOTHING
-	`, today, savedStart)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to record resolve"})
+		writeJSON(w, map[string]string{"error": "failed to read active incident"})
 		return
 	}
 
-	// ── Actualitzar streak_state ──────────────────────────────────────────
-	if currentStreak > 0 {
-		newLongest := longestStreak
-		if currentStreak > newLongest {
-			newLongest = currentStreak
+	if startDate == today {
+		// False report — delete it
+		if _, err = db.Exec(`DELETE FROM incidents WHERE id = $1`, incidentID); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			writeJSON(w, map[string]string{"error": "failed to delete incident"})
+			return
 		}
-		_, err = db.Exec(`
-			UPDATE streak_state
-			   SET longest_streak = $1,
-			       incident_start = NULL,
-			       updated_at     = NOW()
-			 WHERE id = 1
-		`, newLongest)
 	} else {
-		_, err = db.Exec(`
-			UPDATE streak_state
-			   SET incident_start = NULL,
-			       updated_at     = NOW()
-			 WHERE id = 1
-		`)
-	}
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to update streak"})
-		return
+		// Real outage — close it
+		if _, err = db.Exec(
+			`UPDATE incidents SET end_date = $1 WHERE id = $2`,
+			today, incidentID,
+		); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			writeJSON(w, map[string]string{"error": "failed to close incident"})
+			return
+		}
 	}
 
 	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('resolve')`)
 
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, map[string]interface{}{"resolved": true, "date": today})
-}
-
-// calcStreak retorna (avui - startDate + 1) en dies. startDate és "YYYY-MM-DD".
-func calcStreak(startDate string) int {
-	loc, _ := time.LoadLocation("Europe/Madrid")
-	if loc == nil {
-		loc = time.UTC
-	}
-	start, err := time.ParseInLocation("2006-01-02", startDate, loc)
-	if err != nil {
-		return 0
-	}
-	now := time.Now().In(loc)
-	todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	startMid := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
-	days := int(todayMid.Sub(startMid).Hours()/24) + 1
-	if days < 1 {
-		return 0
-	}
-	return days
 }
 
 // ── /api/stats ────────────────────────────────────────────────────────────────
@@ -251,6 +181,11 @@ type StatsResponse struct {
 	LastIncidentDate      string `json:"last_incident_date"`
 	NormalDaysThisYear    int    `json:"normal_days_this_year"`
 	CurrentIncidentStreak int    `json:"current_incident_streak"`
+}
+
+type incidentRow struct {
+	StartDate time.Time
+	EndDate   *time.Time
 }
 
 func statsHandler(w http.ResponseWriter, r *http.Request) {
@@ -281,25 +216,10 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().In(loc)
 
-	// ── Llegir incident_start i longest_streak ───────────────────────────
-	var incidentStartStr sql.NullString
-	var longestStored int
-	_ = db.QueryRow(
-		`SELECT to_char(incident_start, 'YYYY-MM-DD'), longest_streak FROM streak_state WHERE id = 1`,
-	).Scan(&incidentStartStr, &longestStored)
-
-	currentStreak := 0
-	if incidentStartStr.Valid && incidentStartStr.String != "" {
-		currentStreak = calcStreak(incidentStartStr.String)
-	}
-
-	longestStreak := longestStored
-	if currentStreak > longestStreak {
-		longestStreak = currentStreak
-	}
-
 	rows, err := db.Query(
-		`SELECT date FROM incidents WHERE EXTRACT(YEAR FROM date) = $1 ORDER BY date ASC`,
+		`SELECT date, end_date FROM incidents
+		  WHERE EXTRACT(YEAR FROM date) = $1
+		  ORDER BY date ASC`,
 		now.Year(),
 	)
 	if err != nil {
@@ -309,100 +229,104 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var dates []time.Time
+	var incidents []incidentRow
 	for rows.Next() {
-		var d time.Time
-		if err := rows.Scan(&d); err != nil {
+		var start time.Time
+		var end sql.NullTime
+		if err := rows.Scan(&start, &end); err != nil {
 			continue
 		}
-		dates = append(dates, d)
+		row := incidentRow{StartDate: start}
+		if end.Valid {
+			t := end.Time
+			row.EndDate = &t
+		}
+		incidents = append(incidents, row)
 	}
 
-	s := computeStats(dates, now)
-	s.CurrentIncidentStreak = currentStreak
-	s.LongestIncidentStreak = longestStreak
-	writeJSON(w, s)
+	writeJSON(w, computeStats(incidents, now))
 }
 
-func computeStats(dates []time.Time, now time.Time) StatsResponse {
-	s := StatsResponse{}
-	s.TotalThisYear = len(dates)
-
+func computeStats(incidents []incidentRow, now time.Time) StatsResponse {
 	loc := now.Location()
+	todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, loc)
-	todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	daysElapsed := int(todayMid.Sub(yearStart).Hours()/24) + 1
 
-	daysElapsed := int(todayMidnight.Sub(yearStart).Hours()/24) + 1
-
-	if len(dates) == 0 {
-		s.DaysSinceLastIncident = daysElapsed
-		s.NormalDaysThisYear = daysElapsed
-		return s
+	if len(incidents) == 0 {
+		return StatsResponse{
+			DaysSinceLastIncident: daysElapsed,
+			NormalDaysThisYear:    daysElapsed,
+		}
 	}
 
-	normalDay := func(t time.Time) time.Time {
+	day := func(t time.Time) time.Time {
 		d := t.In(loc)
 		return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc)
 	}
 
-	lastRaw := dates[len(dates)-1].In(loc)
-	last := time.Date(lastRaw.Year(), lastRaw.Month(), lastRaw.Day(), 0, 0, 0, 0, loc)
-	s.LastIncidentDate = last.Format("2006-01-02")
-	s.DaysSinceLastIncident = int(todayMidnight.Sub(last).Hours() / 24)
+	totalDays := 0
+	longest := 0
+	currentStreak := 0
+	var lastEndDay time.Time
+	hasLastEnd := false
 
-	maxStreak, cur := 1, 1
-	for i := 1; i < len(dates); i++ {
-		prev := normalDay(dates[i-1])
-		this := normalDay(dates[i])
-		if int(this.Sub(prev).Hours()/24) == 1 {
-			cur++
-			if cur > maxStreak {
-				maxStreak = cur
+	for _, inc := range incidents {
+		start := day(inc.StartDate)
+		var dur int
+
+		if inc.EndDate != nil {
+			end := day(*inc.EndDate)
+			dur = int(end.Sub(start).Hours()/24) + 1
+			if !hasLastEnd || end.After(lastEndDay) {
+				lastEndDay = end
+				hasLastEnd = true
 			}
 		} else {
-			cur = 1
+			dur = int(todayMid.Sub(start).Hours()/24) + 1
+			if dur < 1 {
+				dur = 1
+			}
+			currentStreak = dur
+		}
+
+		totalDays += dur
+		if dur > longest {
+			longest = dur
 		}
 	}
-	s.LongestIncidentStreak = maxStreak
 
-	normalDays := daysElapsed - len(dates)
+	var daysSince int
+	var lastDateStr string
+
+	if currentStreak > 0 {
+		for _, inc := range incidents {
+			if inc.EndDate == nil {
+				lastDateStr = day(inc.StartDate).Format("2006-01-02")
+				break
+			}
+		}
+		daysSince = 0
+	} else if hasLastEnd {
+		daysSince = int(todayMid.Sub(lastEndDay).Hours() / 24)
+		lastDateStr = lastEndDay.Format("2006-01-02")
+	} else {
+		daysSince = daysElapsed
+	}
+
+	normalDays := daysElapsed - totalDays
 	if normalDays < 0 {
 		normalDays = 0
 	}
-	s.NormalDaysThisYear = normalDays
 
-	return s
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-func openDB() (*sql.DB, error) {
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		return nil, err
+	return StatsResponse{
+		TotalThisYear:         totalDays,
+		LongestIncidentStreak: longest,
+		DaysSinceLastIncident: daysSince,
+		LastIncidentDate:      lastDateStr,
+		NormalDaysThisYear:    normalDays,
+		CurrentIncidentStreak: currentStreak,
 	}
-	// Serverless: one connection per invocation, release immediately after use
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(0)
-	return db, nil
-}
-
-func setCORSHeaders(w http.ResponseWriter, methods string) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", methods)
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-}
-
-func writeJSON(w http.ResponseWriter, v interface{}) {
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func todayInMadrid() string {
-	loc, err := time.LoadLocation("Europe/Madrid")
-	if err != nil {
-		loc = time.UTC
-	}
-	return time.Now().In(loc).Format("2006-01-02")
 }
 
 // ── /api/history ──────────────────────────────────────────────────────────────
@@ -434,9 +358,13 @@ func historyHandler(w http.ResponseWriter, r *http.Request) {
 		loc = time.UTC
 	}
 	now := time.Now().In(loc)
+	todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
 	rows, err := db.Query(
-		`SELECT date FROM incidents WHERE EXTRACT(YEAR FROM date) = $1 ORDER BY date ASC`,
+		`SELECT to_char(date, 'YYYY-MM-DD'), end_date
+		   FROM incidents
+		  WHERE EXTRACT(YEAR FROM date) = $1
+		  ORDER BY date DESC`,
 		now.Year(),
 	)
 	if err != nil {
@@ -446,50 +374,42 @@ func historyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var dates []time.Time
-	for rows.Next() {
-		var d time.Time
-		if err := rows.Scan(&d); err != nil {
-			continue
-		}
-		dates = append(dates, d.In(loc))
-	}
-
 	type IncidentPeriod struct {
 		StartDate string `json:"start_date"`
+		EndDate   string `json:"end_date"`
 		Days      int    `json:"days"`
 	}
 
-	day := func(t time.Time) time.Time {
-		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
-	}
+	periods := []IncidentPeriod{}
+	for rows.Next() {
+		var startStr string
+		var endDate sql.NullTime
+		if err := rows.Scan(&startStr, &endDate); err != nil {
+			continue
+		}
 
-	var periods []IncidentPeriod
-	if len(dates) > 0 {
-		start := day(dates[0])
-		count := 1
-		for i := 1; i < len(dates); i++ {
-			prev := day(dates[i-1])
-			curr := day(dates[i])
-			if int(curr.Sub(prev).Hours()/24) == 1 {
-				count++
-			} else {
-				periods = append(periods, IncidentPeriod{StartDate: start.Format("2006-01-02"), Days: count})
-				start = curr
-				count = 1
+		start, err := time.ParseInLocation("2006-01-02", startStr, loc)
+		if err != nil {
+			continue
+		}
+		startMid := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
+
+		var endStr string
+		var days int
+		if endDate.Valid {
+			endMid := time.Date(endDate.Time.Year(), endDate.Time.Month(), endDate.Time.Day(), 0, 0, 0, 0, loc)
+			days = int(endMid.Sub(startMid).Hours()/24) + 1
+			endStr = endMid.Format("2006-01-02")
+		} else {
+			days = int(todayMid.Sub(startMid).Hours()/24) + 1
+			if days < 1 {
+				days = 1
 			}
 		}
-		periods = append(periods, IncidentPeriod{StartDate: start.Format("2006-01-02"), Days: count})
+
+		periods = append(periods, IncidentPeriod{StartDate: startStr, EndDate: endStr, Days: days})
 	}
 
-	// Reverse: most recent first
-	for i, j := 0, len(periods)-1; i < j; i, j = i+1, j-1 {
-		periods[i], periods[j] = periods[j], periods[i]
-	}
-
-	if periods == nil {
-		periods = []IncidentPeriod{}
-	}
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, periods)
 }
@@ -553,6 +473,36 @@ func interactionsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, entries)
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+func openDB() (*sql.DB, error) {
+	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(0)
+	return db, nil
+}
+
+func setCORSHeaders(w http.ResponseWriter, methods string) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", methods)
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
+func writeJSON(w http.ResponseWriter, v interface{}) {
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func todayInMadrid() string {
+	loc, err := time.LoadLocation("Europe/Madrid")
+	if err != nil {
+		loc = time.UTC
+	}
+	return time.Now().In(loc).Format("2006-01-02")
 }
 
 // loadDotEnv lee variables de entorno desde un archivo .env (formato KEY="VALUE")

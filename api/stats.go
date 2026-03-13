@@ -20,8 +20,15 @@ type StatsResponse struct {
 	CurrentIncidentStreak int    `json:"current_incident_streak"`
 }
 
+// incidentRow holds one row from the incidents table.
+// EndDate is nil when the outage is still active (end_date IS NULL).
+type incidentRow struct {
+	StartDate time.Time
+	EndDate   *time.Time
+}
+
 // Handler — GET /api/stats
-// Retorna les estadístiques de l'any en curs calculades des de la taula incidents.
+// Returns statistics for the current year computed from the incidents table.
 func Handler(w http.ResponseWriter, r *http.Request) {
 	setCORSHeaders(w, "GET, OPTIONS")
 	w.Header().Set("Content-Type", "application/json")
@@ -50,37 +57,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now().In(loc)
 
-	// ── Read streak state ─────────────────────────────────────────────
-	// incident_start: data d'inici de l'apagón actiu (NULL si no n'hi ha).
-	// longest_streak: màxim historial guardat (actualitzat en resoldre).
-	// El current_streak es calcula en temps real com (avui - incident_start + 1).
-	var incidentStart sql.NullTime
-	var longestStored int
-	_ = db.QueryRow(
-		`SELECT incident_start, longest_streak FROM streak_state WHERE id = 1`,
-	).Scan(&incidentStart, &longestStored)
-
-	// Calcular current streak dinàmicament
-	currentStreak := 0
-	if incidentStart.Valid {
-		todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-		startIn := incidentStart.Time.In(loc)
-		startMid := time.Date(startIn.Year(), startIn.Month(), startIn.Day(), 0, 0, 0, 0, loc)
-		days := int(todayMid.Sub(startMid).Hours()/24) + 1
-		if days > 0 {
-			currentStreak = days
-		}
-	}
-
-	// longest és el màxim entre l'historial guardat i el streak actiu actual
-	longestStreak := longestStored
-	if currentStreak > longestStreak {
-		longestStreak = currentStreak
-	}
-
-	// ── Read incident dates for date-based stats ──────────────────────
+	// ── Read all incidents for the current year ───────────────────────
 	rows, err := db.Query(
-		`SELECT date FROM incidents
+		`SELECT date, end_date FROM incidents
 		  WHERE EXTRACT(YEAR FROM date) = $1
 		  ORDER BY date ASC`,
 		now.Year(),
@@ -92,103 +71,118 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var dates []time.Time
+	var incidents []incidentRow
 	for rows.Next() {
-		var d time.Time
-		if err := rows.Scan(&d); err != nil {
+		var start time.Time
+		var end sql.NullTime
+		if err := rows.Scan(&start, &end); err != nil {
 			continue
 		}
-		dates = append(dates, d)
+		row := incidentRow{StartDate: start}
+		if end.Valid {
+			t := end.Time
+			row.EndDate = &t
+		}
+		incidents = append(incidents, row)
 	}
 
-	s := computeStats(dates, now)
-	s.CurrentIncidentStreak = currentStreak
-	s.LongestIncidentStreak = longestStreak
-	writeJSON(w, s)
+	writeJSON(w, computeStats(incidents, now))
 }
 
-// computeStats calculates all derived statistics from the sorted incident dates.
-func computeStats(dates []time.Time, now time.Time) StatsResponse {
-	s := StatsResponse{}
-	s.TotalThisYear = len(dates)
-
+// computeStats calculates all derived statistics from the incident rows.
+// Each row represents one outage period (start_date, optional end_date).
+// If end_date is nil, the outage is still active.
+func computeStats(incidents []incidentRow, now time.Time) StatsResponse {
 	loc := now.Location()
+	todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, loc)
-	// Medianoche d'avui en timezone Madrid (Truncate opera en UTC, no en local)
-	todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	daysElapsed := int(todayMid.Sub(yearStart).Hours()/24) + 1
 
-	// Dies transcorreguts des de l'1 de gener fins avui (inclusiu)
-	daysElapsed := int(todayMidnight.Sub(yearStart).Hours()/24) + 1
-
-	if len(dates) == 0 {
-		s.DaysSinceLastIncident = daysElapsed
-		s.NormalDaysThisYear = daysElapsed
-		return s
+	if len(incidents) == 0 {
+		return StatsResponse{
+			DaysSinceLastIncident: daysElapsed,
+			NormalDaysThisYear:    daysElapsed,
+		}
 	}
 
-	// ── Last incident ─────────────────────────────────────────────────
-	// Normalitzem la data de l'incident a medianoche Madrid
-	lastRaw := dates[len(dates)-1].In(loc)
-	last := time.Date(lastRaw.Year(), lastRaw.Month(), lastRaw.Day(), 0, 0, 0, 0, loc)
-	s.LastIncidentDate = last.Format("2006-01-02")
-	s.DaysSinceLastIncident = int(todayMidnight.Sub(last).Hours() / 24)
-
-	// ── Longest incident streak (consecutive days with incidents) ─────
-	// normalDay normalitza un time.Time a medianoche en timezone Madrid
-	normalDay := func(t time.Time) time.Time {
+	day := func(t time.Time) time.Time {
 		d := t.In(loc)
 		return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, loc)
 	}
 
-	maxStreak, cur := 1, 1
-	for i := 1; i < len(dates); i++ {
-		prev := normalDay(dates[i-1])
-		this := normalDay(dates[i])
-		if int(this.Sub(prev).Hours()/24) == 1 {
-			cur++
-			if cur > maxStreak {
-				maxStreak = cur
+	totalDays := 0
+	longest := 0
+	currentStreak := 0
+	var lastEndDay time.Time
+	hasLastEnd := false
+
+	for _, inc := range incidents {
+		start := day(inc.StartDate)
+		var dur int
+
+		if inc.EndDate != nil {
+			end := day(*inc.EndDate)
+			dur = int(end.Sub(start).Hours()/24) + 1
+			if !hasLastEnd || end.After(lastEndDay) {
+				lastEndDay = end
+				hasLastEnd = true
 			}
 		} else {
-			cur = 1
+			// Active outage: duration counts from start to today (inclusive)
+			dur = int(todayMid.Sub(start).Hours()/24) + 1
+			if dur < 1 {
+				dur = 1
+			}
+			currentStreak = dur
+		}
+
+		totalDays += dur
+		if dur > longest {
+			longest = dur
 		}
 	}
-	s.LongestIncidentStreak = maxStreak
 
-	// ── Current incident streak (only if last incident ≤ 1 day ago) ──
-	if s.DaysSinceLastIncident <= 1 {
-		cur = 1
-		for i := len(dates) - 1; i > 0; i-- {
-			prev := normalDay(dates[i-1])
-			this := normalDay(dates[i])
-			if int(this.Sub(prev).Hours()/24) == 1 {
-				cur++
-			} else {
+	var daysSince int
+	var lastDateStr string
+
+	if currentStreak > 0 {
+		// Active outage: find its start date for display
+		for _, inc := range incidents {
+			if inc.EndDate == nil {
+				lastDateStr = day(inc.StartDate).Format("2006-01-02")
 				break
 			}
 		}
-		s.CurrentIncidentStreak = cur
+		daysSince = 0
+	} else if hasLastEnd {
+		daysSince = int(todayMid.Sub(lastEndDay).Hours() / 24)
+		lastDateStr = lastEndDay.Format("2006-01-02")
+	} else {
+		daysSince = daysElapsed
 	}
 
-	// ── Dies amb normalitat aquest any ───────────────────────────────
-	// Dies transcorreguts des de l'1 de gener fins avui, menys les nits amb incident.
-	normalDays := daysElapsed - len(dates)
+	normalDays := daysElapsed - totalDays
 	if normalDays < 0 {
 		normalDays = 0
 	}
-	s.NormalDaysThisYear = normalDays
 
-	return s
+	return StatsResponse{
+		TotalThisYear:         totalDays,
+		LongestIncidentStreak: longest,
+		DaysSinceLastIncident: daysSince,
+		LastIncidentDate:      lastDateStr,
+		NormalDaysThisYear:    normalDays,
+		CurrentIncidentStreak: currentStreak,
+	}
 }
 
-// ── helpers (used only by this handler) ──────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────────────────────
 
 func openDB() (*sql.DB, error) {
 	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
 		return nil, err
 	}
-	// Serverless: one connection per invocation, release immediately after use
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(0)
 	return db, nil

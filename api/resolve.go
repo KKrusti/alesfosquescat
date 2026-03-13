@@ -11,13 +11,13 @@ import (
 )
 
 // Handler — POST /api/resolve
-// Marca la fi d'un apagón (acció global, no lligada a cap IP):
-//   - Llegeix incident_start actual de streak_state.
-//   - Insereix una fila a daily_votes amb ip_hash='community' i action='resolve'
-//     guardant incident_start_saved, perquè si algun veí torna a reportar el
-//     mateix dia, report.go pugui restaurar la data original.
-//   - Actualitza longest_streak si el streak actual el supera.
-//   - Posa incident_start = NULL per indicar que no hi ha apagón actiu.
+// Marks the end of the current outage.
+//
+//   - Finds the open incident (end_date IS NULL).
+//   - If started today: DELETE it (false report).
+//   - Otherwise: set end_date = today (real outage resolved).
+//
+// If no active outage is found, returns already_resolved.
 func Handler(w http.ResponseWriter, r *http.Request) {
 	setCORSHeaders(w, "POST, OPTIONS")
 	w.Header().Set("Content-Type", "application/json")
@@ -42,78 +42,47 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	today := todayInMadrid()
 
-	// ── Llegir incident_start i longest_streak actuals ───────────────────
-	var incidentStart sql.NullString
-	var longestStreak int
-	err = db.QueryRow(
-		`SELECT to_char(incident_start, 'YYYY-MM-DD'), longest_streak FROM streak_state WHERE id = 1`,
-	).Scan(&incidentStart, &longestStreak)
-	if err != nil && err != sql.ErrNoRows {
-		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to read streak state"})
+	// ── Find the active (open) incident ───────────────────────────────
+	var incidentID int
+	var startDate string
+	err = db.QueryRow(`
+		SELECT id, to_char(date, 'YYYY-MM-DD')
+		  FROM incidents
+		 WHERE end_date IS NULL
+		 LIMIT 1
+	`).Scan(&incidentID, &startDate)
+
+	if err == sql.ErrNoRows {
+		// No active outage — nothing to resolve
+		w.WriteHeader(http.StatusOK)
+		writeJSON(w, map[string]interface{}{"resolved": false, "already_resolved": true})
 		return
 	}
-
-	// ── Calcular el streak actual ─────────────────────────────────────────
-	currentStreak := 0
-	if incidentStart.Valid && incidentStart.String != "" {
-		currentStreak = calcStreak(incidentStart.String)
-	}
-
-	// ── Inserir fila resolve a daily_votes amb incident_start_saved ───────
-	// Usem ip_hash='community' perquè resolve és una acció global sense IP.
-	// ON CONFLICT DO NOTHING: evita duplicats si es clica dues vegades avui.
-	// incident_start_saved permet a report.go restaurar la data si algun veí
-	// torna a reportar el mateix dia després d'una resolució.
-	var savedStart interface{}
-	if incidentStart.Valid && incidentStart.String != "" {
-		savedStart = incidentStart.String
-	}
-	_, err = db.Exec(`
-		INSERT INTO daily_votes (ip_hash, date, action, incident_start_saved)
-		VALUES ('community', $1, 'resolve', $2)
-		ON CONFLICT (ip_hash, date, action) DO NOTHING
-	`, today, savedStart)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to record resolve"})
+		writeJSON(w, map[string]string{"error": "failed to read active incident"})
 		return
 	}
 
-	// ── Actualitzar streak_state ──────────────────────────────────────────
-	if currentStreak > 0 {
-		newLongest := longestStreak
-		if currentStreak > newLongest {
-			newLongest = currentStreak
+	// ── Close or delete the incident ──────────────────────────────────
+	if startDate == today {
+		// Outage started today: this is a false report — remove it entirely
+		if _, err = db.Exec(`DELETE FROM incidents WHERE id = $1`, incidentID); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			writeJSON(w, map[string]string{"error": "failed to delete incident"})
+			return
 		}
-		_, err = db.Exec(`
-			UPDATE streak_state
-			   SET longest_streak = $1,
-			       incident_start = NULL,
-			       updated_at     = NOW()
-			 WHERE id = 1
-		`, newLongest)
 	} else {
-		_, err = db.Exec(`
-			UPDATE streak_state
-			   SET incident_start = NULL,
-			       updated_at     = NOW()
-			 WHERE id = 1
-		`)
+		// Real multi-day outage: set end_date to mark it as resolved
+		if _, err = db.Exec(
+			`UPDATE incidents SET end_date = $1 WHERE id = $2`,
+			today, incidentID,
+		); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			writeJSON(w, map[string]string{"error": "failed to close incident"})
+			return
+		}
 	}
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		writeJSON(w, map[string]string{"error": "failed to update streak"})
-		return
-	}
-
-	// Remove today from incidents unconditionally.
-	// Safe because incidents stores only the START DAY of each outage: during a
-	// multi-day outage report.go returns already_active and never inserts today,
-	// so this DELETE is a no-op for real outages. For same-day false reports it
-	// undoes the incident, and it also fixes already-broken state where
-	// incident_start was cleared by a previous resolve but the row was not deleted.
-	_, _ = db.Exec(`DELETE FROM incidents WHERE date = $1`, today)
 
 	// Best-effort log — do not block the response if this fails
 	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('resolve')`)
@@ -125,34 +94,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// calcStreak retorna (avui - startDate + 1) en dies. startDate és "YYYY-MM-DD".
-func calcStreak(startDate string) int {
-	loc, _ := time.LoadLocation("Europe/Madrid")
-	if loc == nil {
-		loc = time.UTC
-	}
-	start, err := time.ParseInLocation("2006-01-02", startDate, loc)
-	if err != nil {
-		return 0
-	}
-	now := time.Now().In(loc)
-	todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	startMid := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
-	days := int(todayMid.Sub(startMid).Hours()/24) + 1
-	if days < 1 {
-		return 0
-	}
-	return days
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── helpers (duplicated per vercel-go isolation requirement) ──────────────────
 
 func openDB() (*sql.DB, error) {
 	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
 		return nil, err
 	}
-	// Serverless: one connection per invocation, release immediately after use
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(0)
 	return db, nil

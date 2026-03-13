@@ -10,15 +10,16 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// IncidentPeriod represents a contiguous block of outage days.
+// IncidentPeriod represents a single outage period from the incidents table.
 type IncidentPeriod struct {
 	StartDate string `json:"start_date"` // YYYY-MM-DD
-	Days      int    `json:"days"`
+	EndDate   string `json:"end_date"`   // YYYY-MM-DD, empty string if still active
+	Days      int    `json:"days"`       // duration in days; ongoing outages count up to today
 }
 
 // Handler — GET /api/history
-// Returns all incident periods for the current year, grouped from consecutive
-// dates in the incidents table, sorted most-recent first.
+// Returns all incident periods for the current year, most-recent first.
+// Each row in the incidents table is one period (start_date, end_date).
 func Handler(w http.ResponseWriter, r *http.Request) {
 	setCORSHeaders(w, "GET, OPTIONS")
 	w.Header().Set("Content-Type", "application/json")
@@ -46,9 +47,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		loc = time.UTC
 	}
 	now := time.Now().In(loc)
+	todayMid := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
 	rows, err := db.Query(
-		`SELECT date FROM incidents WHERE EXTRACT(YEAR FROM date) = $1 ORDER BY date ASC`,
+		`SELECT to_char(date, 'YYYY-MM-DD'), end_date
+		   FROM incidents
+		  WHERE EXTRACT(YEAR FROM date) = $1
+		  ORDER BY date DESC`,
 		now.Year(),
 	)
 	if err != nil {
@@ -58,54 +63,43 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var dates []time.Time
+	periods := []IncidentPeriod{}
 	for rows.Next() {
-		var d time.Time
-		if err := rows.Scan(&d); err != nil {
+		var startStr string
+		var endDate sql.NullTime
+		if err := rows.Scan(&startStr, &endDate); err != nil {
 			continue
 		}
-		dates = append(dates, d.In(loc))
-	}
 
-	periods := groupIntoPeriods(dates, loc)
+		start, err := time.ParseInLocation("2006-01-02", startStr, loc)
+		if err != nil {
+			continue
+		}
+		startMid := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, loc)
 
-	// Reverse to return most-recent first
-	for i, j := 0, len(periods)-1; i < j; i, j = i+1, j-1 {
-		periods[i], periods[j] = periods[j], periods[i]
+		var endStr string
+		var days int
+		if endDate.Valid {
+			endMid := time.Date(endDate.Time.Year(), endDate.Time.Month(), endDate.Time.Day(), 0, 0, 0, 0, loc)
+			days = int(endMid.Sub(startMid).Hours()/24) + 1
+			endStr = endMid.Format("2006-01-02")
+		} else {
+			// Active outage: count days up to today
+			days = int(todayMid.Sub(startMid).Hours()/24) + 1
+			if days < 1 {
+				days = 1
+			}
+		}
+
+		periods = append(periods, IncidentPeriod{
+			StartDate: startStr,
+			EndDate:   endStr,
+			Days:      days,
+		})
 	}
 
 	w.WriteHeader(http.StatusOK)
 	writeJSON(w, periods)
-}
-
-// groupIntoPeriods groups consecutive dates into IncidentPeriod entries.
-func groupIntoPeriods(dates []time.Time, loc *time.Location) []IncidentPeriod {
-	if len(dates) == 0 {
-		return []IncidentPeriod{}
-	}
-
-	day := func(t time.Time) time.Time {
-		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
-	}
-
-	var periods []IncidentPeriod
-	start := day(dates[0])
-	count := 1
-
-	for i := 1; i < len(dates); i++ {
-		prev := day(dates[i-1])
-		curr := day(dates[i])
-		if int(curr.Sub(prev).Hours()/24) == 1 {
-			count++
-		} else {
-			periods = append(periods, IncidentPeriod{StartDate: start.Format("2006-01-02"), Days: count})
-			start = curr
-			count = 1
-		}
-	}
-	periods = append(periods, IncidentPeriod{StartDate: start.Format("2006-01-02"), Days: count})
-
-	return periods
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -115,7 +109,6 @@ func openDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Serverless: one connection per invocation, release immediately after use
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(0)
 	return db, nil

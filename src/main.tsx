@@ -6,6 +6,7 @@ import App from './App'
 import { ErrorPage } from './components/ErrorPage'
 import { LegalPage } from './components/LegalPage'
 import { HistoryPage } from './components/HistoryPage'
+import { AdminPage } from './components/AdminPage'
 import { ThemeProvider } from './context/ThemeContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { SpeedInsights } from "@vercel/speed-insights/react"
@@ -19,6 +20,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<App />} />
           <Route path="/legal" element={<LegalPage />} />
           <Route path="/historial" element={<HistoryPage />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<ErrorPage />} />
         </Routes>
       </BrowserRouter>

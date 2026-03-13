@@ -107,11 +107,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If the incident started today, it was a same-day false report.
-	// Remove today's entry from incidents to restore the normal-day streak.
-	if incidentStart.Valid && incidentStart.String == today {
-		_, _ = db.Exec(`DELETE FROM incidents WHERE date = $1`, today)
-	}
+	// Remove today's incident if it was created today — covers same-day false
+	// reports regardless of whether incident_start has already been cleared
+	// (e.g. a previous resolve call ran before this fix was deployed).
+	_, _ = db.Exec(`
+		DELETE FROM incidents
+		 WHERE date = $1
+		   AND to_char(created_at AT TIME ZONE 'Europe/Madrid', 'YYYY-MM-DD') = $1
+	`, today)
 
 	// Best-effort log — do not block the response if this fails
 	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('resolve')`)

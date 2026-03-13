@@ -4,6 +4,81 @@ const TOKEN_KEY = 'admin_token'
 
 type DeleteState = 'idle' | 'confirming' | 'loading' | 'done' | 'error'
 
+interface InteractionEntry {
+  id: number
+  action: 'report' | 'report_restored' | 'resolve' | 'admin_delete'
+  at: string
+}
+
+function TrashIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4h6v2" />
+    </svg>
+  )
+}
+
+interface ActivityRowProps {
+  entry: InteractionEntry
+  token: string
+  onDeleted: (id: number) => void
+}
+
+function ActivityRow({ entry, token, onDeleted }: ActivityRowProps) {
+  const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+
+  const handleDelete = useCallback(async () => {
+    setState('loading')
+    try {
+      const res = await fetch(`/api/interactions?t=${encodeURIComponent(token)}&id=${entry.id}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setState('done')
+        setTimeout(() => onDeleted(entry.id), 400)
+      } else {
+        setState('error')
+        setTimeout(() => setState('idle'), 2000)
+      }
+    } catch {
+      setState('error')
+      setTimeout(() => setState('idle'), 2000)
+    }
+  }, [entry.id, token, onDeleted])
+
+  const isResolve  = entry.action === 'resolve'
+  const isRestored = entry.action === 'report_restored'
+  const dotColor   = isResolve
+    ? 'bg-emerald-500 dark:bg-emerald-400'
+    : isRestored
+      ? 'bg-orange-400'
+      : 'bg-amber-500 dark:bg-amber-400'
+  const label = isResolve ? 'resolver' : isRestored ? 'restaurar' : entry.action
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2.5 border-b border-stone-200 dark:border-white/7 last:border-0 transition-all duration-300 ${state === 'done' ? 'opacity-0 scale-95' : ''}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+      <span className="text-[12px] text-stone-500 dark:text-white/40 font-mono flex-1 min-w-0">{label}</span>
+      <span className="text-[11px] text-stone-400 dark:text-white/25 font-mono tabular-nums shrink-0">{entry.at}</span>
+      <button
+        onClick={handleDelete}
+        disabled={state !== 'idle'}
+        aria-label="Borrar entrada"
+        className="ml-1 p-1 rounded text-stone-300 dark:text-white/20 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+      >
+        {state === 'loading' ? (
+          <span className="block w-3.5 h-3.5 border border-current border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <TrashIcon />
+        )}
+      </button>
+    </div>
+  )
+}
+
 interface IncidentRowProps {
   date: string
   token: string
@@ -97,7 +172,9 @@ export function AdminPage() {
   const [token, setToken] = useState<string>(() => sessionStorage.getItem(TOKEN_KEY) ?? '')
   const [input, setInput] = useState('')
   const [incidents, setIncidents] = useState<string[]>([])
+  const [interactions, setInteractions] = useState<InteractionEntry[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingInteractions, setLoadingInteractions] = useState(false)
   const [authError, setAuthError] = useState(false)
 
   const fetchIncidents = useCallback(async (t: string) => {
@@ -119,9 +196,21 @@ export function AdminPage() {
     finally { setLoading(false) }
   }, [])
 
+  const fetchInteractions = useCallback(async () => {
+    setLoadingInteractions(true)
+    try {
+      const res = await fetch('/api/interactions')
+      if (res.ok) setInteractions(await res.json())
+    } catch { /* non-critical */ }
+    finally { setLoadingInteractions(false) }
+  }, [])
+
   useEffect(() => {
-    if (token) fetchIncidents(token)
-  }, [token, fetchIncidents])
+    if (token) {
+      fetchIncidents(token)
+      fetchInteractions()
+    }
+  }, [token, fetchIncidents, fetchInteractions])
 
   const handleLogin = useCallback((e: React.FormEvent) => {
     e.preventDefault()
@@ -134,6 +223,10 @@ export function AdminPage() {
 
   const handleDeleted = useCallback((date: string) => {
     setIncidents(prev => prev.filter(d => d !== date))
+  }, [])
+
+  const handleInteractionDeleted = useCallback((id: number) => {
+    setInteractions(prev => prev.filter(e => e.id !== id))
   }, [])
 
   // ── Not authenticated ─────────────────────────────────────────────────────
@@ -194,7 +287,7 @@ export function AdminPage() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => fetchIncidents(token)}
+              onClick={() => { fetchIncidents(token); fetchInteractions() }}
               className="text-[10px] font-mono uppercase tracking-widest text-stone-400 dark:text-white/25 hover:text-amber-600 dark:hover:text-amber-400 transition-colors cursor-pointer"
             >
               Actualizar
@@ -235,6 +328,35 @@ export function AdminPage() {
         <p className="text-center font-mono text-[10px] text-stone-300 dark:text-white/10">
           {incidents.length} incidencia{incidents.length !== 1 ? 's' : ''}
         </p>
+
+        {/* Activity feed */}
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-stone-400 dark:text-white/20 mb-3">
+            Actividad reciente
+          </p>
+          {loadingInteractions ? (
+            <div className="space-y-1">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-9 rounded bg-stone-200 dark:bg-white/5 animate-pulse" />
+              ))}
+            </div>
+          ) : interactions.length === 0 ? (
+            <p className="text-center font-mono text-xs text-stone-400 dark:text-white/20 py-4">
+              Sin actividad
+            </p>
+          ) : (
+            <div className="rounded-lg border border-stone-200 dark:border-white/8 overflow-hidden">
+              {interactions.map(entry => (
+                <ActivityRow
+                  key={entry.id}
+                  entry={entry}
+                  token={token}
+                  onDeleted={handleInteractionDeleted}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

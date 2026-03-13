@@ -79,8 +79,7 @@ func handleList(w http.ResponseWriter, db *sql.DB) {
 	writeJSON(w, map[string]interface{}{"incidents": dates})
 }
 
-// handleDelete removes one incident by date and, if it matches the active
-// incident_start in streak_state, clears the streak too.
+// handleDelete removes one incident by date.
 func handleDelete(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	date := r.URL.Query().Get("date")
 	if !validDate.MatchString(date) {
@@ -101,15 +100,6 @@ func handleDelete(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		writeJSON(w, map[string]string{"error": "incident not found"})
 		return
 	}
-
-	// If the deleted date matches the active streak start, clear it.
-	_, _ = db.Exec(`
-		UPDATE streak_state
-		   SET incident_start = NULL,
-		       updated_at     = NOW()
-		 WHERE id = 1
-		   AND to_char(incident_start, 'YYYY-MM-DD') = $1
-	`, date)
 
 	_, _ = db.Exec(`INSERT INTO interaction_log (action) VALUES ('admin_delete')`)
 

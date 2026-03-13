@@ -1,10 +1,12 @@
 {
   "functions": {
-    "api/report.go":  { "runtime": "@vercel/go@3.4.3" },
-    "api/resolve.go": { "runtime": "@vercel/go@3.4.3" },
-    "api/stats.go":   { "runtime": "@vercel/go@3.4.3" },
-    "api/weather.go": { "runtime": "@vercel/go@3.4.3" },
-    "api/admin.go":   { "runtime": "@vercel/go@3.4.3" }
+    "api/report.go":       { "runtime": "@vercel/go@3.4.3" },
+    "api/resolve.go":      { "runtime": "@vercel/go@3.4.3" },
+    "api/stats.go":        { "runtime": "@vercel/go@3.4.3" },
+    "api/weather.go":      { "runtime": "@vercel/go@3.4.3" },
+    "api/history.go":      { "runtime": "@vercel/go@3.4.3" },
+    "api/interactions.go": { "runtime": "@vercel/go@3.4.3" },
+    "api/admin.go":        { "runtime": "@vercel/go@3.4.3" }
   },
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
